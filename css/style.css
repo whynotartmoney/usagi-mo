@@ -1,0 +1,249 @@
+:root {
+  --cream: #f6e6b4;
+  --cream-deep: #edd48a;
+  --pink: #f3b4c2;
+  --pink-deep: #e8899c;
+  --brown: #3a2418;
+  --sky: #8ec8ea;
+  --ink: #2b1a12;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #6eb4dc;
+  font-family: "Fredoka", "PingFang TC", "Noto Sans TC", sans-serif;
+  touch-action: none;
+  color: var(--ink);
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  background: radial-gradient(120% 80% at 50% 0%, #b9e3f7 0%, var(--sky) 45%, #7bb8de 100%);
+  display: grid;
+  place-items: center;
+}
+
+#game {
+  display: block;
+  image-rendering: auto;
+  background: #8ec8ea;
+}
+
+#hud[hidden],
+#controls[hidden] {
+  display: none !important;
+}
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 12px 0;
+  pointer-events: none;
+}
+
+.hud-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 10px;
+  background: rgba(255, 250, 236, 0.88);
+  border: 3px solid var(--brown);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  box-shadow: 0 3px 0 var(--brown);
+}
+
+.hud-chip img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.hud-ico {
+  color: #e2b23a;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.hud-score {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+#controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 max(16px, env(safe-area-inset-left)) calc(14px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
+  pointer-events: none;
+}
+
+.pad {
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.btn {
+  appearance: none;
+  border: 4px solid var(--brown);
+  background: rgba(246, 230, 180, 0.94);
+  color: var(--brown);
+  font-family: inherit;
+  font-weight: 700;
+  box-shadow: 0 6px 0 var(--brown);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.btn-dir {
+  width: 74px;
+  height: 74px;
+  border-radius: 22px;
+  font-size: 28px;
+}
+
+.btn-jump {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(243, 180, 194, 0.95);
+  font-size: 28px;
+  letter-spacing: 0.08em;
+}
+
+.btn.is-down {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--brown);
+  filter: brightness(0.96);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(142, 200, 234, 0.55), rgba(246, 230, 180, 0.35));
+  padding: 24px;
+}
+
+.overlay[hidden] {
+  display: none !important;
+}
+
+.card {
+  width: min(420px, 100%);
+  text-align: center;
+  background: rgba(255, 250, 236, 0.94);
+  border: 4px solid var(--brown);
+  border-radius: 28px;
+  padding: 28px 22px 22px;
+  box-shadow: 0 8px 0 var(--brown);
+}
+
+.card[hidden] {
+  display: none;
+}
+
+.title-usagi {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  margin: 0 auto 4px;
+  display: block;
+  animation: bounce 1.4s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50% { transform: translateY(-8px) scale(1.03, 0.97); }
+}
+
+.kicker {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.28em;
+  color: #c07a88;
+  font-weight: 700;
+}
+
+h1 {
+  margin: 4px 0 6px;
+  font-size: clamp(32px, 8vw, 42px);
+  letter-spacing: 0.04em;
+}
+
+.lead,
+.hint {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.lead {
+  color: #6a4a3a;
+  font-size: 16px;
+}
+
+.hint {
+  margin-top: 14px;
+  font-size: 13px;
+  color: #8a6a58;
+}
+
+.cta {
+  margin-top: 18px;
+  appearance: none;
+  border: 4px solid var(--brown);
+  background: var(--pink);
+  color: var(--brown);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 22px;
+  padding: 12px 28px;
+  border-radius: 999px;
+  box-shadow: 0 5px 0 var(--brown);
+  cursor: pointer;
+}
+
+.cta:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--brown);
+}
+
+.end-score {
+  margin: 10px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+@media (max-height: 500px) {
+  .btn-dir { width: 62px; height: 62px; }
+  .btn-jump { width: 78px; height: 78px; font-size: 22px; }
+  .title-usagi { width: 84px; height: 84px; }
+  h1 { font-size: 28px; }
+}
