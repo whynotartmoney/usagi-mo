@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#8ec8ea" />
-  <title>兔兔大冒險</title>
+  <title>Usagi X Carya</title>
   <link rel="icon" href="assets/sprites/idle.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -27,6 +27,7 @@
         <img src="assets/sprites/idle.png" alt="" />
         <span id="hud-lives">×3</span>
       </div>
+      <div class="hud-chip" id="hud-world">1-1</div>
       <div class="hud-chip hud-score">
         <span id="hud-score">000000</span>
       </div>
@@ -34,17 +35,17 @@
 
     <div id="controls" hidden>
       <div class="pad">
-        <button type="button" class="btn btn-dir" id="btn-left" aria-label="向左" data-dir="left">◀</button>
-        <button type="button" class="btn btn-dir" id="btn-right" aria-label="向右" data-dir="right">▶</button>
+        <button type="button" class="btn btn-dir" id="btn-left" aria-label="向左"></button>
+        <button type="button" class="btn btn-dir" id="btn-right" aria-label="向右"></button>
       </div>
-      <button type="button" class="btn btn-jump" id="btn-jump" aria-label="跳躍">跳</button>
+      <button type="button" class="btn btn-jump" id="btn-jump" aria-label="跳躍"></button>
     </div>
 
     <div id="overlay" class="overlay">
       <div class="card" id="card-title">
         <img class="title-usagi" src="assets/sprites/idle.png" alt="Usagi" />
-        <p class="kicker">USAGI RUN</p>
-        <h1>兔兔大冒險</h1>
+        <p class="kicker">USAGI X CARYA</p>
+        <h1>Usagi X Carya</h1>
         <p class="lead">橫版過關 · 跑起來、跳過去</p>
         <button type="button" class="cta" id="btn-start">開始遊戲</button>
         <p class="hint">鍵盤：← → 移動　空白鍵跳躍<br />手機：用下方按鍵<br />測試用 · 非商業</p>
@@ -52,7 +53,7 @@
       <div class="card" id="card-end" hidden>
         <img class="title-usagi" src="assets/sprites/win.png" alt="" />
         <h1 id="end-title">過關！</h1>
-        <p class="lead" id="end-msg">你帶兔兔到終點了</p>
+        <p class="lead" id="end-msg">三關都完成了</p>
         <p class="end-score" id="end-score"></p>
         <button type="button" class="cta" id="btn-again">再玩一次</button>
       </div>

@@ -11,6 +11,8 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -24,6 +26,10 @@ body {
   font-family: "Fredoka", "PingFang TC", "Noto Sans TC", sans-serif;
   touch-action: none;
   color: var(--ink);
+}
+
+::selection {
+  background: transparent;
 }
 
 #app {
@@ -42,10 +48,8 @@ body {
   background: #8ec8ea;
 }
 
-#hud[hidden],
-#controls[hidden] {
-  display: none !important;
-}
+#hud {
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -54,6 +58,11 @@ body {
   gap: 8px;
   padding: calc(10px + env(safe-area-inset-top)) 12px 0;
   pointer-events: none;
+}
+
+#hud[hidden],
+#controls[hidden] {
+  display: none !important;
 }
 
 .hud-chip {
@@ -75,6 +84,7 @@ body {
   width: 22px;
   height: 22px;
   object-fit: contain;
+  pointer-events: none;
 }
 
 .hud-ico {
@@ -118,6 +128,16 @@ body {
   cursor: pointer;
   pointer-events: auto;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  outline: none;
+}
+
+.btn:focus,
+.btn:focus-visible,
+.cta:focus,
+.cta:focus-visible {
+  outline: none;
 }
 
 .btn-dir {
@@ -135,6 +155,10 @@ body {
   font-size: 28px;
   letter-spacing: 0.08em;
 }
+
+#btn-left::before { content: "◀"; }
+#btn-right::before { content: "▶"; }
+#btn-jump::before { content: "跳"; }
 
 .btn.is-down {
   transform: translateY(5px);
@@ -177,6 +201,7 @@ body {
   margin: 0 auto 4px;
   display: block;
   animation: bounce 1.4s ease-in-out infinite;
+  pointer-events: none;
 }
 
 @keyframes bounce {
@@ -187,14 +212,14 @@ body {
 .kicker {
   margin: 0;
   font-size: 13px;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.22em;
   color: #c07a88;
   font-weight: 700;
 }
 
 h1 {
   margin: 4px 0 6px;
-  font-size: clamp(32px, 8vw, 42px);
+  font-size: clamp(28px, 7vw, 38px);
   letter-spacing: 0.04em;
 }
 
@@ -228,6 +253,9 @@ h1 {
   border-radius: 999px;
   box-shadow: 0 5px 0 var(--brown);
   cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  outline: none;
 }
 
 .cta:active {
@@ -245,5 +273,5 @@ h1 {
   .btn-dir { width: 62px; height: 62px; }
   .btn-jump { width: 78px; height: 78px; font-size: 22px; }
   .title-usagi { width: 84px; height: 84px; }
-  h1 { font-size: 28px; }
+  h1 { font-size: 26px; }
 }
