@@ -181,7 +181,7 @@ body {
 }
 
 .card {
-  width: min(420px, 100%);
+  width: min(460px, 100%);
   text-align: center;
   background: rgba(255, 250, 236, 0.94);
   border: 4px solid var(--brown);
@@ -202,6 +202,10 @@ body {
   display: block;
   animation: bounce 1.4s ease-in-out infinite;
   pointer-events: none;
+}
+
+.title-usagi[hidden] {
+  display: none !important;
 }
 
 @keyframes bounce {
@@ -269,9 +273,126 @@ h1 {
   font-weight: 700;
 }
 
+.levels-label {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  color: #c07a88;
+}
+
+.card-levels {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.lvl {
+  appearance: none;
+  border: 3px solid var(--brown);
+  background: #fff8e8;
+  color: var(--brown);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.15;
+  padding: 8px 4px 7px;
+  border-radius: 14px;
+  box-shadow: 0 3px 0 var(--brown);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.lvl span {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8a6a58;
+  letter-spacing: 0;
+}
+
+.lvl:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--brown);
+}
+
+.poop {
+  position: relative;
+  width: 118px;
+  height: 118px;
+  margin: 0 auto 6px;
+  animation: poop-bounce 0.52s ease-in-out infinite;
+}
+
+.poop[hidden] {
+  display: none !important;
+}
+
+.poop-blob {
+  position: absolute;
+  left: 50%;
+  background: #6b3a24;
+  border: 3px solid var(--brown);
+  border-radius: 50%;
+}
+
+.poop-3 {
+  width: 38px;
+  height: 30px;
+  top: 10px;
+  margin-left: -14px;
+  z-index: 3;
+}
+
+.poop-2 {
+  width: 68px;
+  height: 48px;
+  top: 26px;
+  margin-left: -34px;
+  z-index: 2;
+}
+
+.poop-1 {
+  width: 96px;
+  height: 64px;
+  top: 50px;
+  margin-left: -48px;
+  z-index: 1;
+  border-radius: 48% 48% 42% 42%;
+}
+
+.poop-face {
+  position: absolute;
+  left: 50%;
+  top: 62px;
+  width: 54px;
+  margin-left: -27px;
+  display: flex;
+  justify-content: space-between;
+  z-index: 4;
+}
+
+.poop-eye {
+  width: 12px;
+  height: 16px;
+  background: #1b120e;
+  border-radius: 50%;
+  box-shadow: 3px -3px 0 0 #fff inset;
+}
+
+@keyframes poop-bounce {
+  0%, 100% { transform: translateY(0) scale(1, 1) rotate(-6deg); }
+  50% { transform: translateY(-22px) scale(1.12, 0.86) rotate(7deg); }
+}
+
 @media (max-height: 500px) {
   .btn-dir { width: 62px; height: 62px; }
   .btn-jump { width: 78px; height: 78px; font-size: 22px; }
   .title-usagi { width: 84px; height: 84px; }
   h1 { font-size: 26px; }
+  .card-levels { gap: 4px; }
+  .lvl { font-size: 12px; padding: 6px 2px; }
+  .poop { width: 84px; height: 84px; }
 }
