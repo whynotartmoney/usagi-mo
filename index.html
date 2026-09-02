@@ -28,6 +28,7 @@
         <span id="hud-lives">×3</span>
       </div>
       <div class="hud-chip" id="hud-world">1-1</div>
+      <div class="hud-chip hud-time" id="hud-time">0:00.00</div>
       <div class="hud-chip hud-score">
         <span id="hud-score">000000</span>
       </div>
@@ -35,10 +36,16 @@
 
     <div id="controls" hidden>
       <div class="pad">
+        <span class="pad-hub" aria-hidden="true"></span>
+        <button type="button" class="btn btn-dir" id="btn-up" aria-label="向上"></button>
         <button type="button" class="btn btn-dir" id="btn-left" aria-label="向左"></button>
         <button type="button" class="btn btn-dir" id="btn-right" aria-label="向右"></button>
+        <button type="button" class="btn btn-dir" id="btn-down" aria-label="向下"></button>
       </div>
-      <button type="button" class="btn btn-jump" id="btn-jump" aria-label="跳躍"></button>
+      <div class="actions">
+        <button type="button" class="btn btn-atk" id="btn-attack" aria-label="攻擊"></button>
+        <button type="button" class="btn btn-jump" id="btn-jump" aria-label="跳躍"></button>
+      </div>
     </div>
 
     <div id="overlay" class="overlay">
@@ -55,11 +62,16 @@
           <button type="button" class="lvl" data-level="2">1-3<span>遊樂場</span></button>
           <button type="button" class="lvl" data-level="3">1-4<span>康丁斯基</span></button>
           <button type="button" class="lvl" data-level="4">1-5<span>天空之城</span></button>
+          <button type="button" class="lvl" data-level="5">1-6<span>海洋之旅</span></button>
+          <button type="button" class="lvl" data-level="6">1-7<span>上樓梯</span></button>
+          <button type="button" class="lvl" data-level="7">1-8<span>彩虹天堂</span></button>
+          <button type="button" class="lvl" data-level="8">1-9<span>露營打怪</span></button>
+          <button type="button" class="lvl" data-level="9">1-10<span>摩天輪城</span></button>
         </div>
-        <p class="hint">鍵盤：← → 移動　空白鍵跳躍<br />手機：用下方按鍵<br />測試用 · 非商業</p>
+        <p class="hint">鍵盤：← → ↑ ↓ 移動　空白鍵跳躍　J 攻擊<br />手機：用下方按鍵<br />測試用 · 非商業</p>
       </div>
       <div class="card" id="card-end" hidden>
-        <img class="title-usagi" id="end-usagi" src="assets/sprites/win.png" alt="" />
+        <img class="title-usagi" id="end-usagi" src="assets/sprites/cheer.png" alt="" />
         <div class="poop" id="end-poop" hidden aria-hidden="true">
           <div class="poop-blob poop-3"></div>
           <div class="poop-blob poop-2"></div>
@@ -70,8 +82,15 @@
           </div>
         </div>
         <h1 id="end-title">過關！</h1>
-        <p class="lead" id="end-msg">五關都完成了</p>
+        <p class="lead" id="end-msg">十關都完成了</p>
+        <div class="end-stats" id="end-stats" hidden>
+          <div><span>時間</span><strong id="end-time">0:00.00</strong></div>
+          <div><span>金幣</span><strong id="end-coins">0</strong></div>
+          <div><span>分數</span><strong id="end-points">000000</strong></div>
+        </div>
         <p class="end-score" id="end-score"></p>
+        <p class="end-times" id="end-times"></p>
+        <button type="button" class="cta" id="btn-next">下一關</button>
         <button type="button" class="cta" id="btn-again">再玩一次</button>
       </div>
     </div>

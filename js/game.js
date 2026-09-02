@@ -12,8 +12,8 @@
   const TILE = 40;
   const VIEW_W = 960;
   const VIEW_H = 540;
-  const MAP_H = 16;
-  const MAP_W = 148;
+  let MAP_H = 16;
+  let MAP_W = 148;
 
   const COL = {
     fill: "#f7e4a8",
@@ -124,6 +124,81 @@
       skyBot: "#9ad4f8",
       name: "sky",
     },
+    ocean: {
+      skyTop: "#b8e8ff",
+      skyBot: "#3a8ec8",
+      grass: "#3ecf8a",
+      grassDark: "#2aa06a",
+      dirt: "#d4b07a",
+      dirtDark: "#b89058",
+      brick: "#4ec4c8",
+      wood: "#f0d48a",
+      pipe: "#2f8f7a",
+      pipeDark: "#1e6a58",
+      hill1: "#7ec8e3",
+      hill2: "#3aa0c8",
+      name: "ocean",
+    },
+    stairs: {
+      skyTop: "#ffe8c8",
+      skyBot: "#f0c090",
+      grass: "#8ed96a",
+      grassDark: "#5caf40",
+      dirt: "#e0b878",
+      dirtDark: "#c49858",
+      brick: "#e8a05a",
+      wood: "#f2c94c",
+      pipe: "#c07040",
+      pipeDark: "#8a4c28",
+      hill1: "#f0d0a0",
+      hill2: "#e0b070",
+      name: "stairs",
+    },
+    rainbow: {
+      skyTop: "#ffe0f0",
+      skyBot: "#c8b8ff",
+      grass: "#7ef0c8",
+      grassDark: "#4cc8a0",
+      dirt: "#ffd6e8",
+      dirtDark: "#f0a8c8",
+      brick: "#ff8fab",
+      wood: "#a78bfa",
+      pipe: "#38bdf8",
+      pipeDark: "#0284c7",
+      hill1: "#fde68a",
+      hill2: "#fda4af",
+      name: "rainbow",
+    },
+    camp: {
+      skyTop: "#ffd6a8",
+      skyBot: "#c45c38",
+      grass: "#5a8a3a",
+      grassDark: "#3d6428",
+      dirt: "#6b4226",
+      dirtDark: "#4a2c18",
+      brick: "#c45c38",
+      wood: "#d4a24c",
+      pipe: "#8a5340",
+      pipeDark: "#5c3828",
+      hill1: "#3d4a38",
+      hill2: "#2a3024",
+      name: "camp",
+    },
+    wheelcity: {
+      skyTop: "#ffe9c8",
+      skyBot: "#ff9ec8",
+      grass: "#7ed957",
+      grassDark: "#4caf50",
+      dirt: "#f0c878",
+      dirtDark: "#d4a24c",
+      brick: "#ff8fab",
+      wood: "#7ec8e3",
+      pipe: "#ff6b9a",
+      pipeDark: "#e0487a",
+      hill1: "#c9b6ff",
+      hill2: "#80d0c7",
+      name: "wheelcity",
+    },
   };
 
   const ACCEL = 2600;
@@ -166,9 +241,18 @@
   let audio;
   let muted = false;
   let level = 0;
-  const LEVEL_COUNT = 5;
-  const LEVEL_LABELS = ["1-1", "1-2", "1-3", "1-4", "1-5"];
+  const LEVEL_COUNT = 10;
+  const LEVEL_LABELS = ["1-1", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-8", "1-9", "1-10"];
   let jumpPool = [];
+  let hasStick = false;
+  let stickSize = null;
+  const STICK_SCALE = { s: 1.25, m: 1.85, l: 2.45 };
+  const STICK_REACH = { s: 44, m: 62, l: 82 };
+  const STICK_NAME = { s: "小棍子", m: "中棍子", l: "大棍子" };
+  let levelTime = 0;
+  let levelTimes = [];
+  let levelStartCoins = 0;
+  let cheerTick = null;
 
   const SPRITES = { idle: null, run: null, jump: null, win: null, cheer: null, ready: false };
 
@@ -199,8 +283,11 @@
   const input = {
     left: false,
     right: false,
+    up: false,
+    down: false,
     jumpHeld: false,
     jumpPressed: false,
+    attackPressed: false,
   };
 
   function clamp(v, a, b) {
@@ -272,6 +359,9 @@
       beep(260, 0.08, "square", 0.04);
     } else if (name === "hurt") {
       beep(220, 0.18, "sawtooth", 0.05);
+    } else if (name === "hit") {
+      beep(340, 0.08, "square", 0.06);
+      setTimeout(() => beep(220, 0.1, "triangle", 0.05), 40);
     } else if (name === "win") {
       [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.16, "square", 0.05), i * 120));
     } else if (name === "die") {
@@ -279,34 +369,38 @@
     }
   }
 
-  function makeGrid() {
+  function makeGrid(h, w) {
+    const gh = h || 16;
+    const gw = w || 148;
     const g = [];
-    for (let y = 0; y < MAP_H; y++) g.push(new Uint8Array(MAP_W));
+    for (let y = 0; y < gh; y++) g.push(new Uint8Array(gw));
     return g;
   }
   function fill(g, x, y, w, h, v) {
+    const gh = g.length;
+    const gw = g[0].length;
     for (let ty = y; ty < y + h; ty++) {
-      if (ty < 0 || ty >= MAP_H) continue;
+      if (ty < 0 || ty >= gh) continue;
       for (let tx = x; tx < x + w; tx++) {
-        if (tx < 0 || tx >= MAP_W) continue;
+        if (tx < 0 || tx >= gw) continue;
         g[ty][tx] = v;
       }
     }
   }
-  function ground(g, x0, x1) {
-    const top = 12;
-    fill(g, x0, top, x1 - x0, 1, T_GRASS);
-    fill(g, x0, top + 1, x1 - x0, MAP_H - top - 1, T_DIRT);
+  function ground(g, x0, x1, top) {
+    const t = top == null ? 12 : top;
+    fill(g, x0, t, x1 - x0, 1, T_GRASS);
+    fill(g, x0, t + 1, x1 - x0, g.length - t - 1, T_DIRT);
   }
   function lavaPit(g, x0, x1) {
-    fill(g, x0, 12, x1 - x0, MAP_H - 12, T_LAVA);
+    fill(g, x0, 12, x1 - x0, g.length - 12, T_LAVA);
   }
-  function pipe(g, x, h) {
-    const top = 12 - h;
+  function pipe(g, x, h, floor) {
+    const top = (floor == null ? 12 : floor) - h;
     fill(g, x, top, 2, h, T_PIPE);
   }
   function walker(x, dir, extra) {
-    const gy = 12 * TILE;
+    const gy = extra && extra.gy != null ? extra.gy : 12 * TILE;
     const eh = extra && extra.h ? extra.h : 28;
     return Object.assign(
       { type: "walk", x: x * TILE, y: gy - eh, w: 30, h: eh, vx: dir, alive: true, squash: 1, t: 0 },
@@ -341,8 +435,49 @@
   function addCoins(list, arr) {
     arr.forEach(([tx, ty]) => list.push({ x: tx * TILE + 10, y: ty * TILE + 10, w: 20, h: 20, taken: false, t: Math.random() * 6 }));
   }
-  function flagAt(tx) {
-    return { x: tx * TILE + 8, y: 1 * TILE, w: 24, h: 11 * TILE, taken: false, slideDone: false };
+  function flagAt(tx, extra) {
+    const y = extra && extra.y != null ? extra.y : 1 * TILE;
+    const h = extra && extra.h != null ? extra.h : 11 * TILE;
+    return { x: tx * TILE + 8, y, w: 24, h, taken: false, slideDone: false };
+  }
+
+  function defaultWheelCars() {
+    return [
+      { kind: "empty" },
+      { kind: "coin" },
+      { kind: "monster" },
+      { kind: "empty" },
+      { kind: "coin" },
+      { kind: "monster" },
+      { kind: "empty" },
+      { kind: "monster" },
+    ];
+  }
+  function makeWheel(cx, cy, r, speed, extra) {
+    return Object.assign(
+      {
+        cx: cx * TILE,
+        cy: cy * TILE,
+        r,
+        rot: 0,
+        speed,
+        cars: defaultWheelCars(),
+        rim: "#ff8fab",
+        inner: "#7ec8e3",
+        hub: "#ffe9a8",
+      },
+      extra || {}
+    );
+  }
+
+  function randomStickSize() {
+    return ["s", "m", "l"][Math.floor(Math.random() * 3)];
+  }
+  function stickPickup(tx, ty, size) {
+    const sz = size || randomStickSize();
+    const w = sz === "l" ? 92 : sz === "m" ? 72 : 52;
+    const h = sz === "l" ? 28 : sz === "m" ? 22 : 18;
+    return { type: "stick", size: sz, x: tx * TILE + 2, y: ty * TILE + (TILE - h) / 2, w, h, taken: false };
   }
 
   function buildLevel(i) {
@@ -350,6 +485,11 @@
     if (i === 2) return buildCarnival();
     if (i === 3) return buildKandinsky();
     if (i === 4) return buildSky();
+    if (i === 5) return buildOcean();
+    if (i === 6) return buildStairs();
+    if (i === 7) return buildRainbow();
+    if (i === 8) return buildCamp();
+    if (i === 9) return buildWheelCity();
     return buildMeadow();
   }
 
@@ -573,6 +713,7 @@
       grid,
       coins,
       enemies: [walker(30, 55), walker(60, -50), walker(86, 45)],
+      pickups: hasStick ? [] : [stickPickup(47, 6)],
       hazards,
       flag: flagAt(138),
       spawn: { x: 2.5 * TILE, y: 12 * TILE - 34 },
@@ -582,39 +723,40 @@
 
   function buildSky() {
     const grid = makeGrid();
-    ground(grid, 0, 18);
-    ground(grid, 36, 52);
-    ground(grid, 70, 88);
-    ground(grid, 116, MAP_W);
+    ground(grid, 0, 20);
+    ground(grid, 38, 54);
+    ground(grid, 74, 90);
+    ground(grid, 118, MAP_W);
 
     fill(grid, 8, 8, 1, 1, T_Q);
-    fill(grid, 20, 9, 4, 1, T_WOOD);
-    fill(grid, 28, 6, 4, 1, T_WOOD);
+    fill(grid, 22, 9, 4, 1, T_WOOD);
     fill(grid, 42, 8, 1, 1, T_Q);
-    fill(grid, 54, 7, 4, 1, T_WOOD);
-    fill(grid, 62, 4, 3, 1, T_WOOD);
-    fill(grid, 78, 8, 2, 1, T_BRICK);
-    fill(grid, 92, 6, 4, 1, T_WOOD);
-    fill(grid, 102, 3, 3, 1, T_WOOD);
-    for (let i = 0; i < 4; i++) fill(grid, 124 + i, 12 - i, 1, i + 1, T_BRICK);
+    fill(grid, 58, 8, 3, 1, T_WOOD);
+    fill(grid, 80, 8, 2, 1, T_BRICK);
+    fill(grid, 96, 7, 3, 1, T_WOOD);
+    for (let i = 0; i < 4; i++) fill(grid, 126 + i, 12 - i, 1, i + 1, T_BRICK);
     fill(grid, 138, 1, 1, 11, T_FLAG);
 
     const coins = [];
     addCoins(coins, [
-      [6, 11], [7, 11], [8, 6], [20, 7], [21, 7], [28, 4], [29, 4],
-      [42, 6], [54, 5], [55, 5], [62, 2], [78, 6], [92, 4], [102, 1],
-      [126, 10], [127, 9],
+      [6, 11], [7, 11], [8, 6], [22, 7], [23, 7],
+      [42, 6], [58, 6], [59, 6], [80, 6], [96, 5],
+      [128, 10], [129, 9],
     ]);
     const balloons = [
-      { x: 20 * TILE, y: 8.2 * TILE, w: 48, h: 16, base: 8.2 * TILE, t: 0 },
-      { x: 26 * TILE, y: 5.6 * TILE, w: 48, h: 16, base: 5.6 * TILE, t: 1.2 },
-      { x: 32 * TILE, y: 7.4 * TILE, w: 48, h: 16, base: 7.4 * TILE, t: 0.5 },
-      { x: 54 * TILE, y: 8 * TILE, w: 52, h: 16, base: 8 * TILE, t: 0.4 },
-      { x: 60 * TILE, y: 5.2 * TILE, w: 48, h: 16, base: 5.2 * TILE, t: 1.6 },
-      { x: 66 * TILE, y: 7.6 * TILE, w: 52, h: 16, base: 7.6 * TILE, t: 2 },
-      { x: 90 * TILE, y: 8 * TILE, w: 48, h: 16, base: 8 * TILE, t: 0.8 },
-      { x: 98 * TILE, y: 5.4 * TILE, w: 52, h: 16, base: 5.4 * TILE, t: 1.4 },
-      { x: 106 * TILE, y: 7.2 * TILE, w: 52, h: 16, base: 7.2 * TILE, t: 0.2 },
+      { x: 22 * TILE, y: 8.4 * TILE, w: 52, h: 16, base: 8.4 * TILE, t: 0 },
+      { x: 26.5 * TILE, y: 6.6 * TILE, w: 52, h: 16, base: 6.6 * TILE, t: 0.8 },
+      { x: 31 * TILE, y: 8.2 * TILE, w: 52, h: 16, base: 8.2 * TILE, t: 1.5 },
+      { x: 35.5 * TILE, y: 6.8 * TILE, w: 52, h: 16, base: 6.8 * TILE, t: 0.3 },
+      { x: 56 * TILE, y: 8.4 * TILE, w: 52, h: 16, base: 8.4 * TILE, t: 0.4 },
+      { x: 61 * TILE, y: 6.5 * TILE, w: 52, h: 16, base: 6.5 * TILE, t: 1.1 },
+      { x: 66 * TILE, y: 8.3 * TILE, w: 52, h: 16, base: 8.3 * TILE, t: 1.8 },
+      { x: 70.5 * TILE, y: 6.7 * TILE, w: 52, h: 16, base: 6.7 * TILE, t: 0.6 },
+      { x: 92 * TILE, y: 8.4 * TILE, w: 52, h: 16, base: 8.4 * TILE, t: 0.2 },
+      { x: 97 * TILE, y: 6.4 * TILE, w: 52, h: 16, base: 6.4 * TILE, t: 1.0 },
+      { x: 102 * TILE, y: 8.2 * TILE, w: 52, h: 16, base: 8.2 * TILE, t: 1.7 },
+      { x: 107 * TILE, y: 6.6 * TILE, w: 52, h: 16, base: 6.6 * TILE, t: 0.5 },
+      { x: 112 * TILE, y: 8.0 * TILE, w: 52, h: 16, base: 8.0 * TILE, t: 1.3 },
     ];
     return {
       theme: "sky",
@@ -622,17 +764,304 @@
       grid,
       coins,
       enemies: [
-        { type: "bird", x: 24 * TILE, y: 5 * TILE, w: 34, h: 24, vx: 70, homeX: 24 * TILE, baseY: 5 * TILE, amp: 36, alive: true, squash: 1, t: 0 },
-        { type: "bird", x: 48 * TILE, y: 3 * TILE, w: 34, h: 24, vx: -60, homeX: 48 * TILE, baseY: 3.2 * TILE, amp: 44, alive: true, squash: 1, t: 0.6 },
-        { type: "bird", x: 76 * TILE, y: 4 * TILE, w: 34, h: 24, vx: 80, homeX: 76 * TILE, baseY: 4.4 * TILE, amp: 50, alive: true, squash: 1, t: 1.1 },
-        { type: "bird", x: 100 * TILE, y: 2.5 * TILE, w: 34, h: 24, vx: -70, homeX: 100 * TILE, baseY: 3 * TILE, amp: 40, alive: true, squash: 1, t: 0.2 },
-        walker(40, 50),
-        walker(80, -45),
+        { type: "bird", x: 10 * TILE, y: 3.2 * TILE, w: 34, h: 24, vx: 55, homeX: 10 * TILE, baseY: 3.2 * TILE, amp: 22, alive: true, squash: 1, t: 0 },
+        { type: "bird", x: 46 * TILE, y: 2.8 * TILE, w: 34, h: 24, vx: -50, homeX: 46 * TILE, baseY: 2.8 * TILE, amp: 20, alive: true, squash: 1, t: 0.6 },
+        { type: "bird", x: 82 * TILE, y: 2.6 * TILE, w: 34, h: 24, vx: 50, homeX: 82 * TILE, baseY: 2.6 * TILE, amp: 18, alive: true, squash: 1, t: 1.1 },
+        walker(44, 40),
+        walker(84, -40),
       ],
       balloons,
+      pickups: hasStick ? [] : [stickPickup(62, 6)],
       flag: flagAt(138),
       spawn: { x: 2.5 * TILE, y: 12 * TILE - 34 },
-      checks: [3 * TILE, 52 * TILE, 88 * TILE, 118 * TILE],
+      checks: [3 * TILE, 54 * TILE, 90 * TILE, 118 * TILE],
+    };
+  }
+
+  function buildOcean() {
+    const grid = makeGrid();
+    ground(grid, 0, 10);
+    ground(grid, 10, 148);
+    fill(grid, 0, 2, 6, 1, T_WOOD);
+    fill(grid, 22, 8, 3, 1, T_WOOD);
+    fill(grid, 34, 6, 3, 1, T_WOOD);
+    fill(grid, 48, 9, 4, 1, T_WOOD);
+    fill(grid, 62, 5, 3, 1, T_WOOD);
+    fill(grid, 78, 8, 3, 1, T_WOOD);
+    fill(grid, 94, 6, 4, 1, T_WOOD);
+    fill(grid, 110, 8, 3, 1, T_WOOD);
+    fill(grid, 124, 4, 4, 1, T_WOOD);
+    pipe(grid, 40, 3);
+    pipe(grid, 70, 4);
+    pipe(grid, 100, 3);
+    for (let i = 0; i < 4; i++) fill(grid, 132 + i, 12 - i, 1, i + 1, T_BRICK);
+    fill(grid, 138, 1, 1, 11, T_FLAG);
+
+    const coins = [];
+    addCoins(coins, [
+      [8, 7], [9, 7], [23, 6], [35, 4], [49, 7], [63, 3],
+      [79, 6], [95, 4], [96, 4], [111, 6], [125, 2], [133, 8],
+    ]);
+    coins.forEach((c) => {
+      c.bubble = true;
+    });
+    return {
+      theme: "ocean",
+      title: "世界 1-6 海洋之旅",
+      grid,
+      coins,
+      waterLine: 3.4 * TILE,
+      enemies: [
+        { type: "jelly", x: 18 * TILE, y: 7 * TILE, w: 28, h: 32, vx: 0, baseY: 7 * TILE, amp: 55, alive: true, squash: 1, t: 0 },
+        { type: "jelly", x: 42 * TILE, y: 6 * TILE, w: 28, h: 32, vx: 0, baseY: 6.2 * TILE, amp: 70, alive: true, squash: 1, t: 1.2 },
+        { type: "jelly", x: 86 * TILE, y: 7 * TILE, w: 28, h: 32, vx: 0, baseY: 7 * TILE, amp: 48, alive: true, squash: 1, t: 0.4 },
+        { type: "jelly", x: 118 * TILE, y: 6.5 * TILE, w: 28, h: 32, vx: 0, baseY: 6.5 * TILE, amp: 60, alive: true, squash: 1, t: 2 },
+        { type: "shark", x: 28 * TILE, y: 8.2 * TILE, w: 58, h: 26, vx: 80, homeX: 36 * TILE, baseY: 8.2 * TILE, amp: 16, alive: true, squash: 1, t: 0 },
+        { type: "shark", x: 72 * TILE, y: 9 * TILE, w: 58, h: 26, vx: -70, homeX: 80 * TILE, baseY: 9 * TILE, amp: 12, alive: true, squash: 1, t: 0.8 },
+        { type: "shark", x: 104 * TILE, y: 7.6 * TILE, w: 58, h: 26, vx: 75, homeX: 108 * TILE, baseY: 7.6 * TILE, amp: 20, alive: true, squash: 1, t: 1.4 },
+      ],
+      hazards: [
+        { type: "spike", x: 16 * TILE, base: 10.2 * TILE, y: 10.2 * TILE, w: 24, h: 28, t: 0, spd: 1.6, amp: 22, axis: "y" },
+        { type: "spike", x: 56 * TILE, base: 10 * TILE, y: 10 * TILE, w: 24, h: 28, t: 0.7, spd: 1.8, amp: 26, axis: "y" },
+        { type: "spike", x: 88 * TILE, base: 10.2 * TILE, y: 10.2 * TILE, w: 24, h: 28, t: 1.3, spd: 1.5, amp: 20, axis: "y" },
+      ],
+      pickups: hasStick ? [] : [stickPickup(63, 3)],
+      flag: flagAt(138),
+      spawn: { x: 2.2 * TILE, y: 2 * TILE - 34 },
+      checks: [3 * TILE, 48 * TILE, 94 * TILE, 124 * TILE],
+    };
+  }
+
+  function buildStairs() {
+    const W = 26;
+    const H = 48;
+    const grid = makeGrid(H, W);
+    const floor = H - 3;
+    ground(grid, 0, W, floor);
+    const plats = [
+      { tx: 2, tw: 8 },
+      { tx: 7, tw: 5 },
+      { tx: 1, tw: 6 },
+      { tx: 5, tw: 10 },
+      { tx: 13, tw: 4 },
+      { tx: 6, tw: 7 },
+      { tx: 11, tw: 9 },
+      { tx: 3, tw: 6 },
+      { tx: 8, tw: 4 },
+      { tx: 0, tw: 8 },
+      { tx: 6, tw: 9 },
+      { tx: 14, tw: 5 },
+      { tx: 9, tw: 6 },
+      { tx: 2, tw: 7 },
+      { tx: 6, tw: 10 },
+      { tx: 14, tw: 6 },
+      { tx: 7, tw: 5 },
+      { tx: 4, tw: 8 },
+      { tx: 10, tw: 7 },
+      { tx: 3, tw: 9 },
+    ];
+    const steps = [];
+    let ty = floor - 2;
+    plats.forEach((p, i) => {
+      fill(grid, p.tx, ty, p.tw, 1, T_WOOD);
+      steps.push({ tx: p.tx, ty, tw: p.tw });
+      if (i < plats.length - 1) ty -= 2;
+    });
+    const top = steps[steps.length - 1];
+    fill(grid, top.tx + 3, 2, 1, 1, T_Q);
+    fill(grid, top.tx + 4, 1, 1, top.ty, T_FLAG);
+    const coins = [];
+    const enemies = [];
+    steps.forEach((s, i) => {
+      if (i % 2 === 0) coins.push({ x: (s.tx + Math.floor(s.tw / 2)) * TILE + 10, y: (s.ty - 1) * TILE + 10, w: 20, h: 20, taken: false, t: i });
+      if (i % 5 === 2) enemies.push(walker(s.tx + 1, i % 2 === 0 ? 40 : -40, { gy: s.ty * TILE }));
+    });
+    return {
+      theme: "stairs",
+      title: "世界 1-7 上樓梯",
+      grid,
+      coins,
+      enemies,
+      pickups: hasStick ? [] : [stickPickup(steps[8].tx + 1, steps[8].ty - 1)],
+      vertical: true,
+      flag: flagAt(top.tx + 4, { y: 1 * TILE, h: top.ty * TILE }),
+      spawn: { x: 4 * TILE, y: floor * TILE - 34 },
+      checks: [],
+    };
+  }
+
+  function buildRainbow() {
+    const W = 28;
+    const H = 56;
+    const grid = makeGrid(H, W);
+    const floor = H - 3;
+    ground(grid, 0, W, floor);
+    const coins = [];
+    const enemies = [];
+    const movers = [];
+    const plats = [
+      { tx: 2, tw: 8, kind: "wood" },
+      { tx: 8, tw: 5, kind: "wood" },
+      { tx: 5, tw: 6, kind: "move" },
+      { tx: 2, tw: 9, kind: "wood" },
+      { tx: 12, tw: 5, kind: "wood" },
+      { tx: 7, tw: 5, kind: "move" },
+      { tx: 10, tw: 8, kind: "wood" },
+      { tx: 4, tw: 6, kind: "wood" },
+      { tx: 8, tw: 6, kind: "move" },
+      { tx: 13, tw: 5, kind: "wood" },
+      { tx: 6, tw: 7, kind: "wood" },
+      { tx: 11, tw: 8, kind: "wood" },
+      { tx: 6, tw: 5, kind: "move" },
+      { tx: 9, tw: 9, kind: "wood" },
+      { tx: 2, tw: 6, kind: "wood" },
+      { tx: 8, tw: 6, kind: "wood" },
+      { tx: 7, tw: 6, kind: "move" },
+      { tx: 12, tw: 5, kind: "wood" },
+      { tx: 5, tw: 8, kind: "wood" },
+      { tx: 10, tw: 6, kind: "wood" },
+      { tx: 3, tw: 8, kind: "wood" },
+      { tx: 8, tw: 10, kind: "wood" },
+    ];
+    let ty = floor - 2;
+    const woods = [];
+    plats.forEach((p, i) => {
+      if (p.kind === "move") {
+        movers.push({
+          x: p.tx * TILE,
+          y: ty * TILE,
+          w: p.tw * TILE,
+          h: 16,
+          baseX: p.tx * TILE,
+          t: i * 0.35,
+          spd: 1.0 + (i % 3) * 0.15,
+          amp: 22 + (i % 3) * 8,
+          axis: "x",
+        });
+      } else {
+        fill(grid, p.tx, ty, p.tw, 1, T_WOOD);
+        woods.push({ tx: p.tx, ty, tw: p.tw });
+        if (i % 2 === 0) coins.push({ x: (p.tx + Math.floor(p.tw / 2)) * TILE + 10, y: (ty - 1) * TILE + 10, w: 20, h: 20, taken: false, t: i });
+        if (i % 5 === 1) enemies.push(walker(p.tx + 1, p.tx < 10 ? 45 : -45, { gy: ty * TILE }));
+      }
+      if (i < plats.length - 1) ty -= 2;
+    });
+    const top = woods[woods.length - 1];
+    fill(grid, top.tx + 4, 1, 1, top.ty, T_FLAG);
+    return {
+      theme: "rainbow",
+      title: "世界 1-8 彩虹天堂",
+      grid,
+      coins,
+      enemies,
+      movers,
+      pickups: hasStick ? [] : [stickPickup(woods[6].tx + 2, woods[6].ty - 1)],
+      vertical: true,
+      flag: flagAt(top.tx + 4, { y: 1 * TILE, h: top.ty * TILE }),
+      spawn: { x: 4 * TILE, y: floor * TILE - 34 },
+      checks: [],
+    };
+  }
+
+  function buildCamp() {
+    const grid = makeGrid();
+    ground(grid, 0, 148);
+    fill(grid, 10, 9, 3, 1, T_WOOD);
+    fill(grid, 12, 7, 3, 1, T_WOOD);
+    fill(grid, 14, 5, 3, 1, T_WOOD);
+    fill(grid, 36, 9, 4, 1, T_WOOD);
+    fill(grid, 38, 7, 3, 1, T_WOOD);
+    fill(grid, 58, 10, 3, 1, T_WOOD);
+    fill(grid, 60, 8, 3, 1, T_WOOD);
+    fill(grid, 62, 6, 3, 1, T_WOOD);
+    fill(grid, 86, 9, 4, 1, T_WOOD);
+    fill(grid, 88, 7, 3, 1, T_WOOD);
+    fill(grid, 110, 10, 3, 1, T_WOOD);
+    fill(grid, 112, 8, 4, 1, T_WOOD);
+    fill(grid, 114, 6, 3, 1, T_WOOD);
+    fill(grid, 20, 8, 1, 1, T_Q);
+    fill(grid, 48, 8, 1, 1, T_Q);
+    fill(grid, 76, 8, 1, 1, T_Q);
+    fill(grid, 104, 8, 1, 1, T_Q);
+    for (let i = 0; i < 4; i++) fill(grid, 130 + i, 12 - i, 1, i + 1, T_BRICK);
+    fill(grid, 138, 1, 1, 11, T_FLAG);
+
+    const coins = [];
+    addCoins(coins, [
+      [6, 11], [7, 11], [12, 5], [14, 3], [38, 5], [48, 6],
+      [62, 4], [76, 6], [88, 5], [104, 6], [114, 4], [132, 8],
+    ]);
+    const enemies = [
+      walker(16, 55), walker(22, -50), walker(28, 48),
+      walker(42, -52), walker(50, 50), walker(54, -46),
+      dinoAt(66, 42), walker(72, -50), walker(80, 55),
+      dinoAt(92, -40), walker(98, 48), walker(106, -52),
+      walker(118, 50), dinoAt(124, -45), walker(128, 40),
+    ];
+    return {
+      theme: "camp",
+      title: "世界 1-9 露營打怪",
+      grid,
+      coins,
+      enemies,
+      pickups: hasStick ? [] : [stickPickup(76, 6)],
+      flag: flagAt(138),
+      spawn: { x: 2.5 * TILE, y: 12 * TILE - 34 },
+      checks: [3 * TILE, 48 * TILE, 86 * TILE, 118 * TILE],
+    };
+  }
+
+  function buildWheelCity() {
+    const W = 176;
+    const grid = makeGrid(16, W);
+    ground(grid, 0, 16);
+    ground(grid, 30, 40);
+    ground(grid, 58, 70);
+    ground(grid, 94, 106);
+    ground(grid, 128, 140);
+    ground(grid, 162, W);
+    fill(grid, 12, 9, 3, 1, T_WOOD);
+    fill(grid, 34, 8, 4, 1, T_WOOD);
+    fill(grid, 62, 9, 3, 1, T_WOOD);
+    fill(grid, 98, 8, 4, 1, T_WOOD);
+    fill(grid, 132, 9, 3, 1, T_WOOD);
+    fill(grid, 20, 8, 1, 1, T_Q);
+    fill(grid, 64, 8, 1, 1, T_Q);
+    fill(grid, 100, 8, 1, 1, T_Q);
+    fill(grid, 166, 8, 1, 1, T_Q);
+    for (let i = 0; i < 4; i++) fill(grid, 168 + i, 12 - i, 1, i + 1, T_BRICK);
+    fill(grid, 172, 1, 1, 11, T_FLAG);
+
+    const coins = [];
+    addCoins(coins, [
+      [4, 11], [5, 11], [13, 7], [35, 6], [36, 6],
+      [63, 7], [99, 6], [133, 7], [164, 11], [169, 8],
+    ]);
+    const wheels = [
+      makeWheel(11, 5.1, 78, 0.85, { rim: "#ffe27a", inner: "#ff8fab", hub: "#fff8e8", rot: 0.8 }),
+      makeWheel(23, 7.4, 132, 0.55, { rim: "#ff8fab", inner: "#ffe27a", hub: "#fff8e8", rot: 0.2 }),
+      makeWheel(38, 4.8, 72, 0.9, { rim: "#fda4af", inner: "#38bdf8", hub: "#fff8e8", rot: 2.1 }),
+      makeWheel(48, 6.2, 168, -0.38, { rim: "#7ec8e3", inner: "#c9b6ff", hub: "#ffe9a8", rot: 1.1 }),
+      makeWheel(68, 5.0, 84, -0.72, { rim: "#7ef0c8", inner: "#c9b6ff", hub: "#fff3c8", rot: 1.5 }),
+      makeWheel(78, 7.1, 124, 0.62, { rim: "#ffd36a", inner: "#ff8fab", hub: "#fff3c8", rot: 2.4 }),
+      makeWheel(86, 5.4, 96, -0.7, { rim: "#c9b6ff", inner: "#7ef0c8", hub: "#ffe9a8", rot: 0.6 }),
+      makeWheel(114, 6.0, 176, 0.34, { rim: "#ff6b9a", inner: "#7ec8e3", hub: "#ffe27a", rot: 3.0 }),
+      makeWheel(126, 4.6, 70, 0.95, { rim: "#ffb7d5", inner: "#7ec8e3", hub: "#ffe9a8", rot: 2.7 }),
+      makeWheel(148, 7.0, 140, -0.48, { rim: "#80d0c7", inner: "#ff8fab", hub: "#fff8e8", rot: 1.8 }),
+      makeWheel(156, 5.2, 88, 0.8, { rim: "#ffe27a", inner: "#c9b6ff", hub: "#ffd6e8", rot: 0.4 }),
+      makeWheel(168, 6.4, 110, -0.52, { rim: "#c9b6ff", inner: "#ffd36a", hub: "#fff8e8", rot: 0.9 }),
+    ];
+    return {
+      theme: "wheelcity",
+      title: "世界 1-10 摩天輪城",
+      grid,
+      coins,
+      enemies: [walker(8, 48), dinoAt(34, -42), walker(96, 50), walker(132, -46), dinoAt(164, 40)],
+      pickups: hasStick ? [] : [stickPickup(64, 6)],
+      wheels,
+      flag: flagAt(172),
+      spawn: { x: 2.5 * TILE, y: 12 * TILE - 34 },
+      checks: [3 * TILE, 60 * TILE, 100 * TILE, 140 * TILE],
     };
   }
 
@@ -664,9 +1093,11 @@
       pose: "idle",
       trail: [],
       checkpoint: x,
+      checkpointY: y,
       flagging: false,
       flagDone: false,
       ride: null,
+      attackT: 0,
     };
   }
 
@@ -704,6 +1135,16 @@
         if (!solid(id)) continue;
         const tile = { x: tx * TILE, y: ty * TILE, w: TILE, h: TILE };
         if (!aabb(p, tile)) continue;
+
+        if (id === T_WOOD) {
+          if (axis !== "y" || p.vy <= 0) continue;
+          const prevFeet = p.y + p.h - p.vy * dt;
+          if (prevFeet > tile.y + 8) continue;
+          p.y = tile.y - p.h;
+          p.vy = 0;
+          p.grounded = true;
+          continue;
+        }
 
         if (axis === "x") {
           if (p.vx > 0) p.x = tile.x - p.w;
@@ -753,14 +1194,21 @@
     }
   }
 
-  function wheelCars() {
-    const w = world && world.wheel;
-    if (!w) return [];
-    const n = w.cars.length;
-    return w.cars.map((car, i) => {
-      const a = w.rot + (i * Math.PI * 2) / n;
-      const hx = w.cx + Math.cos(a) * w.r;
-      const hy = w.cy + Math.sin(a) * w.r;
+  function allWheels() {
+    if (!world) return [];
+    if (world.wheels && world.wheels.length) return world.wheels;
+    if (world.wheel) return [world.wheel];
+    return [];
+  }
+
+  function wheelCars(w) {
+    const wheel = w || (world && world.wheel);
+    if (!wheel) return [];
+    const n = wheel.cars.length;
+    return wheel.cars.map((car, i) => {
+      const a = wheel.rot + (i * Math.PI * 2) / n;
+      const hx = wheel.cx + Math.cos(a) * wheel.r;
+      const hy = wheel.cy + Math.sin(a) * wheel.r;
       const cw = 38;
       const ch = 24;
       return {
@@ -779,47 +1227,54 @@
   }
 
   function updateWheel(dt) {
-    const w = world.wheel;
-    if (!w) return;
-    w.rot += w.speed * dt;
+    allWheels().forEach((w) => {
+      w.rot += w.speed * dt;
+    });
   }
 
   function tryBoardWheel(p) {
-    if (!world.wheel || p.ride != null || p.dead || p.win || p.flagging) return;
-    const cars = wheelCars();
-    for (let i = 0; i < cars.length; i++) {
-      const car = cars[i];
-      const overlapX = p.x + p.w > car.x + 4 && p.x < car.x + car.w - 4;
-      const feet = p.y + p.h;
-      const onSeat = overlapX && feet > car.y - 4 && feet < car.y + 16 && p.y < car.y + 4;
-      if (car.kind === "monster") {
-        if (aabb(p, car) && invuln <= 0) {
-          const dir = p.x + p.w / 2 < car.x + car.w / 2 ? -1 : 1;
-          hitPlayer(dir * 340);
+    const wheels = allWheels();
+    if (!wheels.length || p.ride != null || p.dead || p.win || p.flagging) return;
+    for (let wi = 0; wi < wheels.length; wi++) {
+      const w = wheels[wi];
+      const cars = wheelCars(w);
+      for (let i = 0; i < cars.length; i++) {
+        const car = cars[i];
+        const overlapX = p.x + p.w > car.x + 4 && p.x < car.x + car.w - 4;
+        const feet = p.y + p.h;
+        const onSeat = overlapX && feet > car.y - 4 && feet < car.y + 16 && p.y < car.y + 4;
+        if (car.kind === "monster") {
+          if (aabb(p, car) && invuln <= 0) {
+            const dir = p.x + p.w / 2 < car.x + car.w / 2 ? -1 : 1;
+            hitPlayer(dir * 340);
+          }
+          continue;
         }
-        continue;
-      }
-      if (onSeat && (p.vy > 12 || p.grounded)) {
-        p.ride = car.i;
-        p.vx = 0;
-        p.vy = 0;
-        p.grounded = true;
-        if (car.kind === "coin" && !world.wheel.cars[car.i].taken) {
-          world.wheel.cars[car.i].taken = true;
-          coins += 1;
-          score += 100;
-          sfx("coin");
-          addFloater(car.x + car.w / 2, car.y, "+100");
-          refreshHud();
+        if (onSeat && (p.vy > 12 || p.grounded)) {
+          p.ride = { wi, ci: car.i };
+          p.vx = 0;
+          p.vy = 0;
+          p.grounded = true;
+          if (car.kind === "coin" && !w.cars[car.i].taken) {
+            w.cars[car.i].taken = true;
+            coins += 1;
+            score += 100;
+            sfx("coin");
+            addFloater(car.x + car.w / 2, car.y, "+100");
+            refreshHud();
+          }
+          return;
         }
-        return;
       }
     }
   }
 
   function rideWheel(p, dt) {
-    const cars = wheelCars();
-    const car = cars[p.ride];
+    const wheels = allWheels();
+    const ride = p.ride;
+    const w = ride && wheels[ride.wi];
+    const cars = w ? wheelCars(w) : [];
+    const car = cars[ride && ride.ci];
     if (!car || car.kind === "monster") {
       p.ride = null;
       return false;
@@ -871,6 +1326,78 @@
     });
   }
 
+  function inWater(p) {
+    return world && world.waterLine != null && p.y + p.h * 0.45 > world.waterLine;
+  }
+
+  function updateMovers(dt) {
+    (world.movers || []).forEach((m) => {
+      m.t += dt;
+      const prev = m.x;
+      m.x = m.baseX + Math.sin(m.t * m.spd) * m.amp;
+      m.dx = m.x - prev;
+    });
+  }
+
+  function collideMovers(p) {
+    if (p.vy < -20 || p.ride != null) return;
+    (world.movers || []).forEach((m) => {
+      const overlapX = p.x + p.w > m.x + 6 && p.x < m.x + m.w - 6;
+      const feet = p.y + p.h;
+      if (overlapX && feet >= m.y && feet <= m.y + 16 && p.y < m.y) {
+        p.y = m.y - p.h;
+        p.x += m.dx || 0;
+        p.vy = 0;
+        p.grounded = true;
+      }
+    });
+  }
+
+  function attackBox(p) {
+    const w = STICK_REACH[stickSize] || STICK_REACH.m;
+    const h = stickSize === "l" ? 44 : stickSize === "s" ? 30 : 36;
+    const x = p.facing >= 0 ? p.x + p.w - 6 : p.x - w + 6;
+    return { x, y: p.y + 2, w, h };
+  }
+
+  function tryAttackHit() {
+    if (!hasStick || !player || player.attackT <= 0 || player.attackT < 0.08) return;
+    const box = attackBox(player);
+    (world.enemies || []).forEach((e) => {
+      if (!e.alive) return;
+      if (!aabb(box, e)) return;
+      e.alive = false;
+      score += 150;
+      addFloater(e.x + e.w / 2, e.y, "+150");
+      sfx("stomp");
+      shake = 5;
+      refreshHud();
+    });
+  }
+
+  function collectPickups(p) {
+    (world.pickups || []).forEach((u) => {
+      if (u.taken) return;
+      if (!aabb(p, u)) return;
+      u.taken = true;
+      if (u.type === "stick") {
+        hasStick = true;
+        stickSize = u.size || randomStickSize();
+        sfx("win");
+        addFloater(u.x + 20, u.y, STICK_NAME[stickSize] + "！");
+        banner = { text: "撿到" + STICK_NAME[stickSize], t: 1.8 };
+        refreshHud();
+      }
+    });
+  }
+
+  function formatTime(t) {
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60);
+    const c = Math.floor((t % 1) * 100);
+    return m + ":" + pad(s, 2) + "." + pad(c, 2);
+  }
+
   function updateHazards(dt) {
     (world.hazards || []).forEach((h) => {
       h.t += dt;
@@ -914,20 +1441,21 @@
       p.x = world.flag.x + 2;
       p.facing = 1;
       p.pose = "jump";
-      const groundY = 12 * TILE - p.h;
+      const groundY = world.flag.y + world.flag.h - p.h;
       if (p.y < groundY) {
         p.vy = 220;
         p.y = Math.min(groundY, p.y + p.vy * dt);
       } else {
         p.y = groundY;
         p.vy = 0;
-        p.pose = "win";
         p.sx = 1;
         p.sy = 1;
-        p.bob = Math.abs(Math.sin(p.t * 8)) * 6;
+        p.bob = Math.abs(Math.sin(p.t * 10)) * 8;
+        p.tilt = Math.sin(p.t * 10) * 0.16;
+        p.pose = Math.sin(p.t * 8) > 0 ? "win" : "cheer";
         if (!p.flagDone) {
           p.flagDone = true;
-          setTimeout(() => finishFlag(), 700);
+          setTimeout(() => finishFlag(), 900);
         }
       }
       return;
@@ -940,6 +1468,18 @@
     }
     if (p.ride != null && rideWheel(p, dt)) return;
 
+    if (input.attackPressed) {
+      input.attackPressed = false;
+      if (hasStick && p.attackT <= 0 && !p.dead) {
+        p.attackT = 0.28;
+        sfx("hit");
+      } else if (!hasStick) {
+        addFloater(p.x + p.w / 2, p.y, "還沒有棍子");
+      }
+    }
+    if (p.attackT > 0) p.attackT -= dt;
+
+    const wet = inWater(p);
     const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     const accel = p.grounded ? ACCEL : AIR_ACCEL;
     if (dir !== 0) {
@@ -955,35 +1495,55 @@
     }
     p.vx = clamp(p.vx, -MAX_SPEED, MAX_SPEED);
 
-    if (input.jumpPressed) p.buffer = JUMP_BUF;
+    if (input.jumpPressed || (input.up && p.grounded && !wet)) p.buffer = JUMP_BUF;
     input.jumpPressed = false;
-    if (!input.jumpHeld && p.jumpHeld && p.vy < 0) {
+    if (!input.jumpHeld && !input.up && p.jumpHeld && p.vy < 0) {
       p.vy *= JUMP_CUT;
       p.jumpHeld = false;
     }
-    if (!input.jumpHeld) p.jumpHeld = false;
+    if (!input.jumpHeld && !input.up) p.jumpHeld = false;
 
-    const g = p.vy < 0 ? GRAVITY : FALL_GRAVITY;
-    p.vy = Math.min(MAX_FALL, p.vy + g * dt);
+    if (wet) {
+      const swim = (input.up || input.jumpHeld ? -1 : 0) + (input.down ? 1 : 0);
+      p.vy += swim * 1400 * dt;
+      p.vy += 280 * dt;
+      p.vy *= 1 - Math.min(0.9, dt * 2.4);
+      p.vy = clamp(p.vy, -260, 280);
+      if (input.up || input.jumpHeld) p.jumpHeld = true;
+    } else {
+      if (input.down && p.vy > 0) p.vy = Math.min(MAX_FALL + 220, p.vy + 900 * dt);
+      const g = p.vy < 0 ? GRAVITY : FALL_GRAVITY;
+      p.vy = Math.min(MAX_FALL, p.vy + g * dt);
+    }
 
     p.grounded = false;
     collideAxis(p, dt, "x");
     collideAxis(p, dt, "y");
     collideBalloons(p);
+    collideMovers(p);
     tryBoardWheel(p);
-    p.x = clamp(p.x, 0, MAP_W * TILE - p.w - TILE);
+    p.x = clamp(p.x, 0, MAP_W * TILE - p.w - 4);
 
     if (p.grounded) p.coyote = COYOTE;
     else p.coyote -= dt;
     p.buffer -= dt;
     tryJump(p);
+    tryAttackHit();
+    collectPickups(p);
 
     if (touchesLava(p) || p.y > MAP_H * TILE + 20) die("pit");
 
     const cx = p.x + p.w / 2;
     world.checks.forEach((c) => {
-      if (cx > c && c > p.checkpoint) p.checkpoint = c;
+      if (cx > c && c > p.checkpoint) {
+        p.checkpoint = c;
+        p.checkpointY = p.y;
+      }
     });
+    if (world.vertical && p.grounded && p.y < p.checkpointY - 24) {
+      p.checkpoint = p.x;
+      p.checkpointY = p.y;
+    }
 
     updateAnim(p, dt);
   }
@@ -1097,6 +1657,13 @@
         e.y = e.baseY + Math.sin(e.t * 2.35) * e.amp;
         const home = e.homeX != null ? e.homeX : e.x;
         if (e.x > home + 220 || e.x < home - 220) e.vx *= -1;
+      } else if (e.type === "jelly") {
+        e.y = e.baseY + Math.sin(e.t * 1.6) * e.amp;
+      } else if (e.type === "shark") {
+        e.x += e.vx * dt;
+        e.y = e.baseY + Math.sin(e.t * 1.8) * e.amp;
+        const home = e.homeX != null ? e.homeX : e.x;
+        if (e.x > home + 260 || e.x < home - 260) e.vx *= -1;
       } else {
         e.x += e.vx * dt;
         const front = e.vx > 0 ? e.x + e.w + 2 : e.x - 2;
@@ -1134,6 +1701,10 @@
   function updateCoins(dt) {
     world.coins.forEach((c) => {
       c.t += dt;
+      if (c.bubble) {
+        c.y += Math.sin(c.t * 1.8) * 12 * dt;
+        c.x += Math.sin(c.t * 1.1) * 8 * dt;
+      }
       if (c.taken) return;
       if (aabb(player, c)) {
         c.taken = true;
@@ -1177,13 +1748,50 @@
 
   function finishFlag() {
     if (state !== "play") return;
+    levelTimes[level] = levelTime;
+    player.win = true;
+    player.flagging = false;
+    player.vx = 0;
+    player.vy = 0;
     if (level + 1 < LEVEL_COUNT) {
-      loadLevel(level + 1);
+      showClear();
     } else {
-      player.win = true;
-      player.flagging = false;
-      setTimeout(() => showEnd(true), 400);
+      setTimeout(() => showEnd(true), 500);
     }
+  }
+
+  function startCheerPose() {
+    const usagi = document.getElementById("end-usagi");
+    if (!usagi) return;
+    usagi.hidden = false;
+    usagi.classList.add("is-cheer");
+    let on = false;
+    usagi.src = "assets/sprites/cheer.png";
+    if (cheerTick) clearInterval(cheerTick);
+    cheerTick = setInterval(() => {
+      on = !on;
+      usagi.src = on ? "assets/sprites/win.png" : "assets/sprites/cheer.png";
+    }, 280);
+  }
+
+  function stopCheerPose() {
+    if (cheerTick) {
+      clearInterval(cheerTick);
+      cheerTick = null;
+    }
+    const usagi = document.getElementById("end-usagi");
+    if (usagi) usagi.classList.remove("is-cheer");
+  }
+
+  function fillEndStats(show) {
+    const box = document.getElementById("end-stats");
+    if (!box) return;
+    box.hidden = !show;
+    if (!show) return;
+    const gained = Math.max(0, coins - levelStartCoins);
+    document.getElementById("end-time").textContent = formatTime(levelTimes[level] != null ? levelTimes[level] : levelTime);
+    document.getElementById("end-coins").textContent = "+" + gained;
+    document.getElementById("end-points").textContent = pad(score, 6);
   }
 
   function hitPlayer(kx) {
@@ -1219,10 +1827,13 @@
 
   function respawn() {
     const x = player.checkpoint;
-    player = makePlayer(x, world.spawn.y);
+    const y = player.checkpointY != null ? player.checkpointY : world.spawn.y;
+    player = makePlayer(x, y);
     player.checkpoint = x;
+    player.checkpointY = y;
     invuln = 1.4;
     cam.x = Math.max(0, player.x - 200);
+    cam.y = clamp(player.y - VIEW_H * 0.62, 0, Math.max(0, MAP_H * TILE - VIEW_H));
     banner = { text: "再出發！", t: 1.4 };
   }
 
@@ -1281,12 +1892,12 @@
   }
 
   function updateCamera(dt) {
-    const look = player.facing > 0 ? VIEW_W * 0.34 : VIEW_W * 0.52;
+    const look = world.vertical ? VIEW_W * 0.42 : player.facing > 0 ? VIEW_W * 0.34 : VIEW_W * 0.52;
     const tx = player.x - look;
-    const ty = clamp(player.y - VIEW_H * 0.62, 0, MAP_H * TILE - VIEW_H);
-    cam.x = lerp(cam.x, tx, 1 - Math.pow(0.02, dt));
-    cam.y = lerp(cam.y, ty, 1 - Math.pow(0.04, dt));
-    cam.x = clamp(cam.x, 0, MAP_W * TILE - VIEW_W);
+    const ty = clamp(player.y - VIEW_H * 0.62, 0, Math.max(0, MAP_H * TILE - VIEW_H));
+    cam.x = lerp(cam.x, tx, 1 - Math.pow(world.vertical ? 0.05 : 0.02, dt));
+    cam.y = lerp(cam.y, ty, 1 - Math.pow(world.vertical ? 0.03 : 0.04, dt));
+    cam.x = clamp(cam.x, 0, Math.max(0, MAP_W * TILE - VIEW_W));
     cam.y = clamp(cam.y, 0, Math.max(0, MAP_H * TILE - VIEW_H));
   }
 
@@ -1303,7 +1914,7 @@
 
   function pickSprite(pose) {
     if (pose === "run" && SPRITES.run) return { img: SPRITES.run, side: true };
-    if (pose === "jump" && SPRITES.run) return { img: SPRITES.run, side: true };
+    if (pose === "jump" && (SPRITES.jump || SPRITES.run)) return { img: SPRITES.jump || SPRITES.run, side: true };
     if (pose === "win" && SPRITES.win) return { img: SPRITES.win, side: false };
     if (pose === "cheer" && SPRITES.cheer) return { img: SPRITES.cheer, side: false };
     return { img: SPRITES.idle || SPRITES.run, side: false };
@@ -1460,6 +2071,14 @@
     }
     if (e.type === "bird") {
       drawBird(e);
+      return;
+    }
+    if (e.type === "jelly") {
+      drawJelly(e);
+      return;
+    }
+    if (e.type === "shark") {
+      drawShark(e);
       return;
     }
     const x = e.x + e.w / 2;
@@ -1654,6 +2273,71 @@
     ctx.restore();
   }
 
+  function drawJelly(e) {
+    const x = e.x + e.w / 2;
+    const y = e.y + e.h / 2;
+    const pulse = 1 + Math.sin(e.t * 4) * 0.08;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(pulse, e.alive ? 1 : e.squash);
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = COL.line;
+    ctx.fillStyle = "rgba(255, 160, 210, 0.85)";
+    ctx.beginPath();
+    ctx.ellipse(0, -4, 14, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(58,36,24,0.7)";
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 5, 6);
+      ctx.quadraticCurveTo(i * 5 + Math.sin(e.t * 6 + i) * 4, 16, i * 5, 22);
+      ctx.stroke();
+    }
+    ctx.fillStyle = COL.eye;
+    ctx.beginPath();
+    ctx.ellipse(-4, -6, 2, 2.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(4, -6, 2, 2.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawShark(e) {
+    const x = e.x + e.w / 2;
+    const y = e.y + e.h / 2;
+    const face = e.vx >= 0 ? 1 : -1;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(face, e.alive ? 1 : e.squash);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = COL.line;
+    ctx.fillStyle = "#7aa0b8";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 26, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(4, -10);
+    ctx.lineTo(10, -22);
+    ctx.lineTo(16, -10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#5a8098";
+    ctx.beginPath();
+    ctx.moveTo(-24, 0);
+    ctx.lineTo(-36, -8);
+    ctx.lineTo(-36, 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = COL.eye;
+    ctx.beginPath();
+    ctx.ellipse(14, -3, 2.4, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawBalloon(b) {
     const cx = b.x + b.w / 2;
     const top = b.y - 28;
@@ -1739,25 +2423,29 @@
   }
 
   function drawWheel() {
-    const w = world.wheel;
+    const wheels = allWheels();
+    wheels.forEach(drawOneWheel);
+  }
+
+  function drawOneWheel(w) {
     if (!w) return;
+    const cars = wheelCars(w);
     ctx.save();
     ctx.translate(w.cx, w.cy);
-    ctx.lineWidth = 7;
+    ctx.lineWidth = Math.max(5, w.r / 28);
     ctx.strokeStyle = "#3a2418";
     ctx.beginPath();
     ctx.arc(0, 0, w.r, 0, Math.PI * 2);
     ctx.stroke();
     ctx.lineWidth = 4;
-    ctx.strokeStyle = "#ff8fab";
+    ctx.strokeStyle = w.rim || "#ff8fab";
     ctx.beginPath();
     ctx.arc(0, 0, w.r - 8, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.strokeStyle = "#7ec8e3";
+    ctx.strokeStyle = w.inner || "#7ec8e3";
     ctx.beginPath();
     ctx.arc(0, 0, w.r * 0.55, 0, Math.PI * 2);
     ctx.stroke();
-    const cars = wheelCars();
     cars.forEach((car) => {
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -1766,9 +2454,9 @@
       ctx.lineWidth = 3;
       ctx.stroke();
     });
-    ctx.fillStyle = "#ffe9a8";
+    ctx.fillStyle = w.hub || "#ffe9a8";
     ctx.beginPath();
-    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+    ctx.arc(0, 0, Math.max(12, w.r * 0.09), 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#3a2418";
     ctx.lineWidth = 3;
@@ -1833,6 +2521,15 @@
     const bob = Math.sin(c.t * 3) * 3;
     ctx.save();
     ctx.translate(c.x + 10, c.y + 10 + bob);
+    if (c.bubble) {
+      ctx.fillStyle = "rgba(180, 230, 255, 0.35)";
+      ctx.strokeStyle = "rgba(255,255,255,0.8)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
     ctx.scale(spin, 1);
     ctx.fillStyle = COL.coin;
     ctx.strokeStyle = "#c7922a";
@@ -1870,7 +2567,7 @@
       volcanoHill(0.4, 1.1);
       ctx.fillStyle = COL.hill2;
       volcanoHill(0.58, 0.7);
-    } else if (theme === "carnival") {
+    } else if (theme === "carnival" || theme === "wheelcity") {
       ctx.fillStyle = "rgba(255,255,255,0.75)";
       for (let i = 0; i < 8; i++) {
         const cx = ((i * 220 - cam.x * 0.25 + t * 8) % (VIEW_W + 180)) - 60;
@@ -1893,6 +2590,34 @@
       hill(0.25, 0.12, 260);
       ctx.fillStyle = "rgba(184,224,255,0.7)";
       hill(0.45, 0.2, 180);
+    } else if (theme === "ocean") {
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      for (let i = 0; i < 6; i++) {
+        const cx = ((i * 240 - cam.x * 0.2 + t * 4) % (VIEW_W + 180)) - 60;
+        cloud(cx, 22 + (i % 2) * 12, 0.45);
+      }
+    } else if (theme === "stairs") {
+      ctx.fillStyle = COL.hill1;
+      hill(0.4, 0.14, 180);
+      ctx.fillStyle = COL.hill2;
+      hill(0.6, 0.2, 140);
+    } else if (theme === "rainbow") {
+      const bands = ["#ff8fab", "#ffd36a", "#7ef0c8", "#7ec8e3", "#c9b6ff"];
+      bands.forEach((c, i) => {
+        ctx.strokeStyle = c;
+        ctx.globalAlpha = 0.45;
+        ctx.lineWidth = 14;
+        ctx.beginPath();
+        ctx.arc(VIEW_W * 0.5 - cam.x * 0.08, VIEW_H + 40, 220 + i * 16, Math.PI, Math.PI * 2);
+        ctx.stroke();
+      });
+      ctx.globalAlpha = 1;
+    } else if (theme === "camp") {
+      ctx.fillStyle = COL.hill2;
+      hill(0.4, 0.22, 200);
+      ctx.fillStyle = COL.hill1;
+      hill(0.58, 0.16, 160);
+      drawTents();
     } else {
       ctx.fillStyle = "rgba(255,255,255,0.88)";
       for (let i = 0; i < 8; i++) {
@@ -2167,6 +2892,112 @@
     ctx.restore();
   }
 
+  function drawWater() {
+    if (!world || world.waterLine == null) return;
+    const y = world.waterLine;
+    const t = player ? player.t : 0;
+    ctx.fillStyle = "rgba(40, 120, 180, 0.38)";
+    ctx.fillRect(-20, y, MAP_W * TILE + 40, MAP_H * TILE - y + 40);
+    ctx.fillStyle = "rgba(120, 200, 230, 0.45)";
+    ctx.beginPath();
+    ctx.moveTo(-20, y);
+    for (let x = -20; x <= MAP_W * TILE + 20; x += 12) {
+      ctx.lineTo(x, y + Math.sin(x * 0.04 + t * 3) * 4);
+    }
+    ctx.lineTo(MAP_W * TILE + 20, y + 14);
+    ctx.lineTo(-20, y + 14);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawMovers() {
+    (world.movers || []).forEach((m) => {
+      ctx.fillStyle = "#a78bfa";
+      roundRect(m.x, m.y, m.w, m.h, 8);
+      ctx.fill();
+      ctx.strokeStyle = COL.line;
+      ctx.lineWidth = 2.3;
+      ctx.stroke();
+      ctx.fillStyle = "#fde68a";
+      roundRect(m.x + 8, m.y + 4, m.w - 16, 6, 3);
+      ctx.fill();
+    });
+  }
+
+  function drawPickups() {
+    (world.pickups || []).forEach((u) => {
+      if (u.taken) return;
+      drawStickGraphic(u.x + u.w / 2, u.y + u.h / 2, 0.15, 1, u.size);
+    });
+  }
+
+  function drawStickGraphic(x, y, rot, s, size) {
+    const sc = (STICK_SCALE[size] || STICK_SCALE.m) * s;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.scale(sc, sc);
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = COL.line;
+    ctx.fillStyle = "#f5dc3a";
+    roundRect(-32, -8, 64, 16, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#fffef2";
+    roundRect(-40, -10, 16, 20, 7);
+    ctx.fill();
+    ctx.stroke();
+    roundRect(24, -10, 16, 20, 7);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#fffef2";
+    ctx.beginPath();
+    ctx.ellipse(-35, -16, 2.4, 5.5, -0.22, 0, Math.PI * 2);
+    ctx.ellipse(-27, -16, 2.4, 5.5, 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = COL.line;
+    ctx.beginPath();
+    ctx.arc(-34, -2, 1.7, 0, Math.PI * 2);
+    ctx.arc(-28, -2, 1.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-31, 3, 3.2, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawHeldStick() {
+    if (!hasStick || !player || player.dead) return;
+    const swinging = player.attackT > 0;
+    const reach = STICK_REACH[stickSize] || STICK_REACH.m;
+    const ang = swinging ? -0.2 - (0.28 - player.attackT) * 8 * player.facing : 0.55 * player.facing;
+    const ox = player.x + player.w / 2 + player.facing * (swinging ? reach * 0.38 : 16);
+    const oy = player.y + 16 - player.bob;
+    drawStickGraphic(ox, oy, ang, swinging ? 1.08 : 0.92, stickSize);
+  }
+
+  function drawDiveGear() {
+    if (!world || world.theme !== "ocean" || !player) return;
+    const x = player.x + player.w / 2;
+    const y = player.y + player.h - player.bob;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(player.facing, 1);
+    ctx.strokeStyle = COL.line;
+    ctx.lineWidth = 2.2;
+    ctx.fillStyle = "rgba(80, 180, 220, 0.45)";
+    ctx.beginPath();
+    ctx.ellipse(0, -52, 16, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#4aa0c8";
+    roundRect(12, -48, 10, 18, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function worldToScreen() {
     const sx = Math.round(shake ? (Math.random() - 0.5) * shake : 0);
     const sy = Math.round(shake ? (Math.random() - 0.5) * shake : 0);
@@ -2179,9 +3010,12 @@
     ctx.save();
     worldToScreen();
     drawTiles();
+    drawWater();
     drawWheel();
     (world.balloons || []).forEach(drawBalloon);
+    drawMovers();
     drawHazards();
+    drawPickups();
     world.coins.forEach((c) => {
       if (!c.taken) drawCoin(c);
     });
@@ -2214,6 +3048,8 @@
       tilt: player.tilt,
       pose: player.pose,
     });
+    drawDiveGear();
+    drawHeldStick();
     ctx.restore();
     drawWorldFx();
     ctx.restore();
@@ -2226,6 +3062,10 @@
     document.getElementById("hud-score").textContent = pad(score, 6);
     const worldEl = document.getElementById("hud-world");
     if (worldEl) worldEl.textContent = LEVEL_LABELS[level] || "1-1";
+    const timeEl = document.getElementById("hud-time");
+    if (timeEl) timeEl.textContent = formatTime(levelTime);
+    const atk = document.getElementById("btn-attack");
+    if (atk) atk.classList.toggle("is-off", !hasStick);
   }
 
   function applyTheme(name) {
@@ -2237,14 +3077,18 @@
   function loadLevel(i) {
     level = i;
     world = buildLevel(i);
+    MAP_H = world.grid.length;
+    MAP_W = world.grid[0].length;
     applyTheme(world.theme);
     player = makePlayer(world.spawn.x, world.spawn.y);
-    cam.x = 0;
-    cam.y = 0;
+    cam.x = clamp(player.x - VIEW_W * 0.35, 0, Math.max(0, MAP_W * TILE - VIEW_W));
+    cam.y = clamp(player.y - VIEW_H * 0.62, 0, Math.max(0, MAP_H * TILE - VIEW_H));
     particles = [];
     floaters = [];
     invuln = 0.9;
+    levelTime = 0;
     banner = { text: world.title, t: 2 };
+    levelStartCoins = coins;
     refreshHud();
   }
 
@@ -2270,6 +3114,17 @@
     coins = 0;
     lives = 3;
     const i = Number.isInteger(startLevel) ? startLevel : 0;
+    hasStick = false;
+    stickSize = null;
+    levelTimes = [];
+    levelTime = 0;
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    input.jumpHeld = false;
+    input.jumpPressed = false;
+    input.attackPressed = false;
     loadLevel(i);
     state = "play";
     overlay.hidden = true;
@@ -2281,12 +3136,53 @@
 
   function showTitle() {
     state = "title";
+    stopCheerPose();
     overlay.hidden = false;
     overlay.inert = false;
     cardTitle.hidden = false;
     cardEnd.hidden = true;
     hud.hidden = true;
     controls.hidden = true;
+  }
+
+  function showClear() {
+    state = "clear";
+    overlay.hidden = false;
+    overlay.inert = false;
+    cardTitle.hidden = true;
+    cardEnd.hidden = false;
+    const usagi = document.getElementById("end-usagi");
+    const poop = document.getElementById("end-poop");
+    if (usagi) usagi.hidden = false;
+    if (poop) poop.hidden = true;
+    startCheerPose();
+    document.getElementById("end-title").textContent = "過關！";
+    document.getElementById("end-msg").textContent = (world && world.title ? world.title : LEVEL_LABELS[level]) + " 完成";
+    fillEndStats(true);
+    document.getElementById("end-score").textContent = "";
+    const timesEl = document.getElementById("end-times");
+    if (timesEl) timesEl.textContent = "";
+    document.getElementById("btn-next").hidden = false;
+    document.getElementById("btn-again").hidden = true;
+    controls.hidden = true;
+  }
+
+  function goNextLevel() {
+    if (state !== "clear") return;
+    stopCheerPose();
+    overlay.hidden = true;
+    overlay.inert = true;
+    hud.hidden = false;
+    controls.hidden = false;
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    input.jumpHeld = false;
+    input.jumpPressed = false;
+    loadLevel(level + 1);
+    state = "play";
+    refreshHud();
   }
 
   function showEnd(win) {
@@ -2299,9 +3195,21 @@
     const poop = document.getElementById("end-poop");
     if (usagi) usagi.hidden = !win;
     if (poop) poop.hidden = win;
+    if (win) startCheerPose();
+    else stopCheerPose();
     document.getElementById("end-title").textContent = win ? "全部過關！" : "遊戲結束";
-    document.getElementById("end-msg").textContent = win ? "Usagi X Carya 五關完成" : "掉下去或碰到敵人就會失敗";
-    document.getElementById("end-score").textContent = "分數 " + pad(score, 6) + "　金幣 " + coins;
+    document.getElementById("end-msg").textContent = win ? "Usagi X Carya 十關完成" : "掉下去或碰到敵人就會失敗";
+    fillEndStats(win);
+    document.getElementById("end-score").textContent = win ? "" : "分數 " + pad(score, 6) + "　金幣 " + coins;
+    const timesEl = document.getElementById("end-times");
+    if (timesEl) {
+      const rows = levelTimes
+        .map((t, i) => (t != null ? LEVEL_LABELS[i] + "　" + formatTime(t) : ""))
+        .filter(Boolean);
+      timesEl.textContent = rows.length ? rows.join("　·　") : "";
+    }
+    document.getElementById("btn-next").hidden = true;
+    document.getElementById("btn-again").hidden = false;
     controls.hidden = true;
   }
 
@@ -2318,8 +3226,14 @@
     const dt = Math.min(0.033, (now - last) / 1000 || 0.016);
     last = now;
     if (state === "play") {
+      if (player && !player.dead && !player.flagging && !player.win) {
+        levelTime += dt;
+        const timeEl = document.getElementById("hud-time");
+        if (timeEl) timeEl.textContent = formatTime(levelTime);
+      }
       updateWheel(dt);
       updateBalloons(dt);
+      updateMovers(dt);
       updatePlayer(player, dt);
       updateEnemies(dt);
       updateHazards(dt);
@@ -2327,6 +3241,13 @@
       updateFlag();
       updateFx(dt);
       updateCamera(dt);
+      render();
+    } else if (state === "clear") {
+      if (player) {
+        player.t += dt;
+        updateAnim(player, dt);
+      }
+      updateFx(dt);
       render();
     } else if (state === "title" || !world) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2373,6 +3294,19 @@
     () => (input.right = false)
   );
   bindButton(
+    document.getElementById("btn-up"),
+    () => {
+      input.up = true;
+      input.jumpPressed = true;
+    },
+    () => (input.up = false)
+  );
+  bindButton(
+    document.getElementById("btn-down"),
+    () => (input.down = true),
+    () => (input.down = false)
+  );
+  bindButton(
     document.getElementById("btn-jump"),
     () => {
       input.jumpHeld = true;
@@ -2380,29 +3314,49 @@
     },
     () => (input.jumpHeld = false)
   );
+  bindButton(
+    document.getElementById("btn-attack"),
+    () => {
+      input.attackPressed = true;
+    },
+    () => {}
+  );
 
   window.addEventListener("keydown", (e) => {
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space", " "].includes(e.key) || e.code === "Space") e.preventDefault();
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", " "].includes(e.key) || e.code === "Space") e.preventDefault();
     if (e.repeat) {
       if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") input.left = true;
       if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") input.right = true;
+      if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") input.up = true;
+      if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") input.down = true;
       return;
     }
     if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") input.left = true;
     if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") input.right = true;
-    if (e.key === " " || e.code === "Space" || e.key === "ArrowUp" || e.key === "w" || e.key === "W" || e.key === "z" || e.key === "k") {
+    if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
+      input.up = true;
+      input.jumpPressed = true;
+    }
+    if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") input.down = true;
+    if (e.key === " " || e.code === "Space" || e.key === "z" || e.key === "k") {
       input.jumpHeld = true;
       input.jumpPressed = true;
+    }
+    if (e.key === "j" || e.key === "J" || e.key === "x" || e.key === "X" || e.code === "ControlLeft") {
+      input.attackPressed = true;
     }
     if ((e.key === "Enter" || e.code === "Space") && state !== "play") {
       if (state === "title") startGame(0);
       if (state === "end") showTitle();
+      if (state === "clear") goNextLevel();
     }
   });
   window.addEventListener("keyup", (e) => {
     if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") input.left = false;
     if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") input.right = false;
-    if (e.key === " " || e.code === "Space" || e.key === "ArrowUp" || e.key === "w" || e.key === "W" || e.key === "z" || e.key === "k") {
+    if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") input.up = false;
+    if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") input.down = false;
+    if (e.key === " " || e.code === "Space" || e.key === "z" || e.key === "k") {
       input.jumpHeld = false;
     }
   });
@@ -2411,6 +3365,7 @@
   window.addEventListener("dragstart", (e) => e.preventDefault());
   document.getElementById("btn-start").addEventListener("click", () => startGame(0));
   document.getElementById("btn-again").addEventListener("click", showTitle);
+  document.getElementById("btn-next").addEventListener("click", goNextLevel);
   document.querySelectorAll("#level-select .lvl").forEach((btn) => {
     btn.addEventListener("click", () => startGame(Number(btn.dataset.level)));
   });
@@ -2423,6 +3378,22 @@
     { passive: false }
   );
 
+  window.addEventListener("blur", () => {
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    input.jumpHeld = false;
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) return;
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    input.jumpHeld = false;
+  });
+
   resize();
   const qs = new URLSearchParams(location.search);
   if (qs.get("autostart") === "1") {
@@ -2433,14 +3404,6 @@
       player.checkpoint = warp;
       cam.x = Math.max(0, warp - 280);
     }
-    input.right = true;
-    setTimeout(() => {
-      input.jumpPressed = true;
-      input.jumpHeld = true;
-      setTimeout(() => {
-        input.jumpHeld = false;
-      }, 220);
-    }, 2600);
   }
   if (qs.get("end") === "lose") showEnd(false);
   requestAnimationFrame(loop);
