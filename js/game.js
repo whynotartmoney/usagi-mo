@@ -489,6 +489,18 @@
   function randomStickSize() {
     return ["s", "m", "l"][Math.floor(Math.random() * 3)];
   }
+  function bouncePad(tx, ty, power) {
+    const floor = (ty == null ? 12 : ty) * TILE;
+    return {
+      x: tx * TILE + 2,
+      y: floor - 20,
+      w: 36,
+      h: 20,
+      power: power == null ? -1200 : power,
+      squash: 0,
+    };
+  }
+
   function stickPickup(tx, ty, size) {
     const sz = size || randomStickSize();
     const w = sz === "l" ? 64 : sz === "m" ? 54 : 44;
@@ -1155,6 +1167,7 @@
         { type: "spike", x: 64 * TILE, base: 3.2 * TILE, y: 3.2 * TILE, w: 24, h: 28, t: 0.8, spd: 1.5, amp: 16, axis: "y" },
       ],
       pickups: hasStick ? [] : [stickPickup(56, 4)],
+      bounces: [bouncePad(77), bouncePad(69), bouncePad(97)],
       flag: flagAt(124, { y: 2 * TILE, h: 10 * TILE }),
       spawn: { x: 2.2 * TILE, y: 12 * TILE - 34 },
       checks: [3 * TILE, 40 * TILE, 70 * TILE, 100 * TILE],
@@ -1194,6 +1207,7 @@
       flagDone: false,
       ride: null,
       attackT: 0,
+      bounceLock: 0,
     };
   }
 
@@ -1435,6 +1449,28 @@
     });
   }
 
+  function collideBounces(p) {
+    (world.bounces || []).forEach((b) => {
+      b.squash = Math.max(0, b.squash - 0.08);
+      if (p.vy < 40) return;
+      const overlapX = p.x + p.w > b.x + 2 && p.x < b.x + b.w - 2;
+      const feet = p.y + p.h;
+      if (!overlapX || feet < b.y - 6 || feet > b.y + b.h + 8 || p.y >= b.y) return;
+      p.y = b.y - p.h;
+      p.vy = b.power;
+      p.grounded = false;
+      p.coyote = 0;
+      p.buffer = 0;
+      p.jumpHeld = true;
+      p.bounceLock = 0.22;
+      p.sx = 0.72;
+      p.sy = 1.38;
+      b.squash = 1;
+      sfx("jump");
+      spawnDust(p.x + p.w / 2, b.y + 4, 6);
+    });
+  }
+
   function collideMovers(p) {
     if (p.vy < -20 || p.ride != null) return;
     (world.movers || []).forEach((m) => {
@@ -1617,7 +1653,8 @@
 
     if (input.jumpPressed || (input.up && p.grounded && !wet)) p.buffer = JUMP_BUF;
     input.jumpPressed = false;
-    if (!input.jumpHeld && !input.up && p.jumpHeld && p.vy < 0) {
+    if (p.bounceLock > 0) p.bounceLock -= dt;
+    if (!input.jumpHeld && !input.up && p.jumpHeld && p.vy < 0 && p.bounceLock <= 0) {
       p.vy *= JUMP_CUT;
       p.jumpHeld = false;
     }
@@ -1641,6 +1678,7 @@
     collideAxis(p, dt, "y");
     collideBalloons(p);
     collideMovers(p);
+    collideBounces(p);
     tryBoardWheel(p);
     p.x = clamp(p.x, 0, MAP_W * TILE - p.w - 4);
 
@@ -2488,6 +2526,41 @@
     ctx.restore();
   }
 
+  function drawBounces() {
+    (world.bounces || []).forEach((b) => {
+      const sq = 1 - b.squash * 0.5;
+      const h = Math.max(8, b.h * sq);
+      const y = b.y + b.h - h;
+      const cx = b.x + b.w / 2;
+      ctx.save();
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = COL.line;
+      ctx.fillStyle = "#e23d28";
+      roundRect(b.x + 3, y + h - 7, 7, 10, 2);
+      ctx.fill();
+      ctx.stroke();
+      roundRect(b.x + b.w - 10, y + h - 7, 7, 10, 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#ff5a6a";
+      roundRect(b.x, y, b.w, h - 4, 10);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#fff3c8";
+      ctx.beginPath();
+      ctx.ellipse(cx, y + (h - 4) * 0.42, b.w * 0.32, (h - 4) * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffe27a";
+      ctx.beginPath();
+      ctx.arc(cx - 8, y + 5, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx + 8, y + 6, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
   function drawHazards() {
     (world.hazards || []).forEach((h) => {
       if (h.type === "spike") {
@@ -3180,6 +3253,7 @@
     drawWheel();
     (world.balloons || []).forEach(drawBalloon);
     drawMovers();
+    drawBounces();
     drawHazards();
     drawPickups();
     world.coins.forEach((c) => {
