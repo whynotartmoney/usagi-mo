@@ -1,0 +1,10 @@
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+*.log
+.tmp-*.png
+.idea/
+.vscode/
+.cursor/
+node_modules/

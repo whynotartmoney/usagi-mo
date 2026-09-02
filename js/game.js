@@ -199,6 +199,21 @@
       hill2: "#80d0c7",
       name: "wheelcity",
     },
+    maze: {
+      skyTop: "#c8e8b8",
+      skyBot: "#5a8a48",
+      grass: "#6bb84a",
+      grassDark: "#3d7a32",
+      dirt: "#7a5a38",
+      dirtDark: "#5a3c24",
+      brick: "#4a8a3a",
+      wood: "#c4a05a",
+      pipe: "#3d6b32",
+      pipeDark: "#2a4a24",
+      hill1: "#6a9a4a",
+      hill2: "#3d6a32",
+      name: "maze",
+    },
   };
 
   const ACCEL = 2600;
@@ -241,13 +256,14 @@
   let audio;
   let muted = false;
   let level = 0;
-  const LEVEL_COUNT = 10;
-  const LEVEL_LABELS = ["1-1", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-8", "1-9", "1-10"];
+  const LEVEL_COUNT = 11;
+  const LEVEL_LABELS = ["1-1", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-8", "1-9", "1-10", "1-11"];
   let jumpPool = [];
   let hasStick = false;
   let stickSize = null;
-  const STICK_SCALE = { s: 1.25, m: 1.85, l: 2.45 };
-  const STICK_REACH = { s: 44, m: 62, l: 82 };
+  const STICK_SCALE = { s: 0.82, m: 1.05, l: 1.22 };
+  const HEAD_FLY = { s: 70, m: 96, l: 112 };
+  const ATTACK_DUR = 0.55;
   const STICK_NAME = { s: "小棍子", m: "中棍子", l: "大棍子" };
   let levelTime = 0;
   let levelTimes = [];
@@ -475,8 +491,8 @@
   }
   function stickPickup(tx, ty, size) {
     const sz = size || randomStickSize();
-    const w = sz === "l" ? 92 : sz === "m" ? 72 : 52;
-    const h = sz === "l" ? 28 : sz === "m" ? 22 : 18;
+    const w = sz === "l" ? 64 : sz === "m" ? 54 : 44;
+    const h = sz === "l" ? 22 : sz === "m" ? 18 : 16;
     return { type: "stick", size: sz, x: tx * TILE + 2, y: ty * TILE + (TILE - h) / 2, w, h, taken: false };
   }
 
@@ -490,6 +506,7 @@
     if (i === 7) return buildRainbow();
     if (i === 8) return buildCamp();
     if (i === 9) return buildWheelCity();
+    if (i === 10) return buildMaze();
     return buildMeadow();
   }
 
@@ -1065,6 +1082,85 @@
     };
   }
 
+  function buildMaze() {
+    const W = 128;
+    const grid = makeGrid(16, W);
+    fill(grid, 0, 0, W, 12, T_BRICK);
+    ground(grid, 0, W);
+    const hole = (x, y, w, h) => fill(grid, x, y, w, h, T_EMPTY);
+
+    hole(0, 10, 18, 2);
+    hole(6, 7, 3, 4);
+    hole(0, 7, 8, 2);
+    hole(9, 7, 16, 2);
+    hole(18, 10, 16, 2);
+    hole(22, 4, 3, 4);
+    hole(8, 3, 22, 2);
+    hole(28, 3, 3, 6);
+    hole(24, 7, 18, 2);
+    hole(38, 7, 3, 5);
+    hole(40, 10, 22, 2);
+    hole(48, 7, 3, 4);
+    hole(50, 7, 20, 2);
+    hole(58, 3, 3, 5);
+    hole(54, 3, 16, 2);
+    hole(68, 3, 3, 8);
+    hole(66, 10, 24, 2);
+    hole(76, 4, 3, 7);
+    hole(78, 3, 22, 2);
+    hole(96, 3, 3, 8);
+    hole(92, 10, 28, 2);
+    hole(108, 6, 14, 3);
+    hole(118, 2, 10, 10);
+
+    fill(grid, 12, 9, 4, 1, T_WOOD);
+    fill(grid, 44, 9, 5, 1, T_WOOD);
+    fill(grid, 84, 9, 4, 1, T_WOOD);
+    fill(grid, 108, 9, 6, 1, T_WOOD);
+    fill(grid, 14, 6, 1, 1, T_Q);
+    fill(grid, 34, 2, 1, 1, T_Q);
+    fill(grid, 62, 2, 1, 1, T_Q);
+    fill(grid, 90, 2, 1, 1, T_Q);
+    fill(grid, 112, 5, 1, 1, T_Q);
+    fill(grid, 124, 1, 1, 11, T_FLAG);
+
+    const coins = [];
+    addCoins(coins, [
+      [3, 11], [4, 11], [2, 8], [3, 8], [4, 8],
+      [26, 11], [27, 11], [28, 11],
+      [12, 4], [13, 4], [18, 4], [19, 4],
+      [32, 8], [33, 8],
+      [56, 4], [57, 4], [58, 4],
+      [80, 4], [81, 4], [86, 4],
+      [100, 11], [101, 11],
+      [110, 7], [111, 7], [114, 7],
+      [120, 3], [121, 3],
+    ]);
+    return {
+      theme: "maze",
+      title: "世界 1-11 迷宮",
+      grid,
+      coins,
+      enemies: [
+        walker(10, 40, { gy: 12 * TILE }),
+        walker(24, -45, { gy: 12 * TILE }),
+        walker(14, 38, { gy: 9 * TILE }),
+        walker(30, -42, { gy: 9 * TILE }),
+        walker(54, 40, { gy: 9 * TILE }),
+        walker(82, -40, { gy: 5 * TILE }),
+        walker(98, 48, { gy: 12 * TILE }),
+      ],
+      hazards: [
+        { type: "spike", x: 30 * TILE, base: 10.2 * TILE, y: 10.2 * TILE, w: 24, h: 28, t: 0.2, spd: 1.7, amp: 18, axis: "y" },
+        { type: "spike", x: 64 * TILE, base: 3.2 * TILE, y: 3.2 * TILE, w: 24, h: 28, t: 0.8, spd: 1.5, amp: 16, axis: "y" },
+      ],
+      pickups: hasStick ? [] : [stickPickup(56, 4)],
+      flag: flagAt(124, { y: 2 * TILE, h: 10 * TILE }),
+      spawn: { x: 2.2 * TILE, y: 12 * TILE - 34 },
+      checks: [3 * TILE, 40 * TILE, 70 * TILE, 100 * TILE],
+    };
+  }
+
   function makePlayer(x, y) {
     return {
       x,
@@ -1353,15 +1449,39 @@
     });
   }
 
+  function slingState(p) {
+    if (!p || p.attackT <= 0) return { poke: 0, pull: 0, fly: 0 };
+    const u = 1 - p.attackT / ATTACK_DUR;
+    if (u < 0.16) return { poke: u / 0.16, pull: 0, fly: 0 };
+    if (u < 0.34) return { poke: 1, pull: (u - 0.16) / 0.18, fly: 0 };
+    const t = (u - 0.34) / 0.66;
+    let fly;
+    if (t < 0.32) fly = Math.pow(t / 0.32, 0.65);
+    else if (t < 0.48) fly = 1;
+    else fly = Math.max(0, 1 - Math.pow((t - 0.48) / 0.52, 1.15));
+    return { poke: 1, pull: 0, fly };
+  }
+
+  function dollHeadBox(p) {
+    const facing = p.facing >= 0 ? 1 : -1;
+    const st = slingState(p);
+    const sc = STICK_SCALE[stickSize] || STICK_SCALE.m;
+    const fly = (HEAD_FLY[stickSize] || HEAD_FLY.m) * st.fly;
+    const pull = st.pull * 18 * sc;
+    const poke = st.poke * 14;
+    const tip = 30 * sc;
+    const hx = p.x + p.w / 2 + facing * (10 + poke + tip + fly - pull);
+    const hy = p.y + 15 - (p.bob || 0);
+    const r = 10 * sc;
+    return { x: hx - r, y: hy - r, w: r * 2, h: r * 2 };
+  }
+
   function attackBox(p) {
-    const w = STICK_REACH[stickSize] || STICK_REACH.m;
-    const h = stickSize === "l" ? 44 : stickSize === "s" ? 30 : 36;
-    const x = p.facing >= 0 ? p.x + p.w - 6 : p.x - w + 6;
-    return { x, y: p.y + 2, w, h };
+    return dollHeadBox(p);
   }
 
   function tryAttackHit() {
-    if (!hasStick || !player || player.attackT <= 0 || player.attackT < 0.08) return;
+    if (!hasStick || !player || player.attackT <= 0 || slingState(player).fly < 0.18) return;
     const box = attackBox(player);
     (world.enemies || []).forEach((e) => {
       if (!e.alive) return;
@@ -1471,8 +1591,8 @@
     if (input.attackPressed) {
       input.attackPressed = false;
       if (hasStick && p.attackT <= 0 && !p.dead) {
-        p.attackT = 0.28;
-        sfx("hit");
+        p.attackT = ATTACK_DUR;
+        sfx("jump");
       } else if (!hasStick) {
         addFloater(p.x + p.w / 2, p.y, "還沒有棍子");
       }
@@ -2612,6 +2732,19 @@
         ctx.stroke();
       });
       ctx.globalAlpha = 1;
+    } else if (theme === "maze") {
+      ctx.fillStyle = "rgba(40, 70, 30, 0.18)";
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.fillStyle = COL.hill2;
+      hill(0.38, 0.2, 160);
+      ctx.fillStyle = COL.hill1;
+      hill(0.55, 0.16, 200);
+      ctx.strokeStyle = "rgba(30, 50, 24, 0.28)";
+      ctx.lineWidth = 10;
+      for (let i = 0; i < 6; i++) {
+        const x = ((i * 210 - cam.x * 0.12) % (VIEW_W + 160)) - 40;
+        ctx.strokeRect(x, 48 + (i % 3) * 18, 70, 90);
+      }
     } else if (theme === "camp") {
       ctx.fillStyle = COL.hill2;
       hill(0.4, 0.22, 200);
@@ -2927,54 +3060,87 @@
   function drawPickups() {
     (world.pickups || []).forEach((u) => {
       if (u.taken) return;
-      drawStickGraphic(u.x + u.w / 2, u.y + u.h / 2, 0.15, 1, u.size);
+      drawStickWeapon(u.x + u.w / 2, u.y + u.h / 2, 1, u.size, { poke: 0, pull: 0, fly: 0 }, 0.12);
     });
   }
 
-  function drawStickGraphic(x, y, rot, s, size) {
-    const sc = (STICK_SCALE[size] || STICK_SCALE.m) * s;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(rot);
-    ctx.scale(sc, sc);
-    ctx.lineWidth = 2.4;
-    ctx.strokeStyle = COL.line;
-    ctx.fillStyle = "#f5dc3a";
-    roundRect(-32, -8, 64, 16, 6);
-    ctx.fill();
-    ctx.stroke();
+  function drawBunnyCap() {
     ctx.fillStyle = "#fffef2";
-    roundRect(-40, -10, 16, 20, 7);
+    roundRect(-11, -10, 22, 20, 8);
     ctx.fill();
-    ctx.stroke();
-    roundRect(24, -10, 16, 20, 7);
-    ctx.fill();
+    ctx.strokeStyle = COL.line;
+    ctx.lineWidth = 2.3;
     ctx.stroke();
     ctx.fillStyle = "#fffef2";
     ctx.beginPath();
-    ctx.ellipse(-35, -16, 2.4, 5.5, -0.22, 0, Math.PI * 2);
-    ctx.ellipse(-27, -16, 2.4, 5.5, 0.22, 0, Math.PI * 2);
+    ctx.ellipse(-4.6, -13, 2.4, 5.4, -0.28, 0, Math.PI * 2);
+    ctx.ellipse(3.4, -13.2, 2.4, 5.4, 0.18, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = COL.line;
     ctx.beginPath();
-    ctx.arc(-34, -2, 1.7, 0, Math.PI * 2);
-    ctx.arc(-28, -2, 1.7, 0, Math.PI * 2);
+    ctx.arc(-3.4, -1.6, 1.55, 0, Math.PI * 2);
+    ctx.arc(3.6, -1.6, 1.55, 0, Math.PI * 2);
     ctx.fill();
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(-31, 3, 3.2, 0.2, Math.PI - 0.2);
+    ctx.arc(0.2, 3.2, 3.1, 0.2, Math.PI - 0.2);
     ctx.stroke();
+  }
+
+  function drawStickWeapon(x, y, facing, size, sling, rot) {
+    const sc = STICK_SCALE[size] || STICK_SCALE.m;
+    const st = sling || { poke: 0, pull: 0, fly: 0 };
+    const fly = ((HEAD_FLY[size] || HEAD_FLY.m) / sc) * st.fly;
+    const pull = st.pull * 18;
+    const headX = 32 - pull + fly;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot || 0);
+    ctx.scale((facing >= 0 ? 1 : -1) * sc, sc);
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = COL.line;
+    ctx.fillStyle = "#f5dc3a";
+    roundRect(-28, -6, 56, 12, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#fffef2";
+    roundRect(-36, -8, 14, 16, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = COL.line;
+    ctx.lineWidth = 2.8;
+    ctx.beginPath();
+    ctx.moveTo(18, 0);
+    ctx.lineTo(28, -13);
+    ctx.lineTo(31, -13);
+    ctx.moveTo(18, 0);
+    ctx.lineTo(28, 13);
+    ctx.lineTo(31, 13);
+    ctx.stroke();
+    ctx.strokeStyle = "#e07050";
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(31, -13);
+    ctx.quadraticCurveTo((31 + headX) / 2 - 6 - pull * 0.25, -4, headX - 8, 0);
+    ctx.moveTo(31, 13);
+    ctx.quadraticCurveTo((31 + headX) / 2 - 6 - pull * 0.25, 4, headX - 8, 0);
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(headX, 0);
+    drawBunnyCap();
+    ctx.restore();
     ctx.restore();
   }
 
   function drawHeldStick() {
     if (!hasStick || !player || player.dead) return;
-    const swinging = player.attackT > 0;
-    const reach = STICK_REACH[stickSize] || STICK_REACH.m;
-    const ang = swinging ? -0.2 - (0.28 - player.attackT) * 8 * player.facing : 0.55 * player.facing;
-    const ox = player.x + player.w / 2 + player.facing * (swinging ? reach * 0.38 : 16);
-    const oy = player.y + 16 - player.bob;
-    drawStickGraphic(ox, oy, ang, swinging ? 1.08 : 0.92, stickSize);
+    const st = slingState(player);
+    const facing = player.facing >= 0 ? 1 : -1;
+    const poke = 8 + st.poke * 16;
+    const ox = player.x + player.w / 2 + facing * poke;
+    const oy = player.y + 15 - player.bob;
+    drawStickWeapon(ox, oy, facing, stickSize, st, 0);
   }
 
   function drawDiveGear() {
@@ -3198,7 +3364,7 @@
     if (win) startCheerPose();
     else stopCheerPose();
     document.getElementById("end-title").textContent = win ? "全部過關！" : "遊戲結束";
-    document.getElementById("end-msg").textContent = win ? "Usagi X Carya 十關完成" : "掉下去或碰到敵人就會失敗";
+    document.getElementById("end-msg").textContent = win ? "Usagi X Carya 十一關完成" : "掉下去或碰到敵人就會失敗";
     fillEndStats(win);
     document.getElementById("end-score").textContent = win ? "" : "分數 " + pad(score, 6) + "　金幣 " + coins;
     const timesEl = document.getElementById("end-times");
