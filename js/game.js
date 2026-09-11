@@ -242,6 +242,8 @@
   let dpr = 1;
   let state = "title";
   let mode3d = false;
+  let heroKind = "usagi";
+  let customHead = null;
   let last = 0;
   let shake = 0;
   let world;
@@ -295,6 +297,7 @@
     SPRITES.win = win;
     SPRITES.cheer = cheer;
     SPRITES.ready = !!(idle || run);
+    if (typeof syncHeroUi === "function") syncHeroUi();
   });
 
   const input = {
@@ -1921,6 +1924,19 @@
 
   function startCheerPose() {
     const usagi = document.getElementById("end-usagi");
+    const endCv = document.getElementById("end-hero");
+    if (heroKind !== "usagi") {
+      if (usagi) {
+        usagi.hidden = true;
+        usagi.classList.remove("is-cheer");
+      }
+      if (endCv) {
+        endCv.hidden = false;
+        paintHeroOn(endCv, heroKind, 2.1, 0);
+      }
+      return;
+    }
+    if (endCv) endCv.hidden = true;
     if (!usagi) return;
     usagi.hidden = false;
     usagi.classList.add("is-cheer");
@@ -2273,6 +2289,303 @@
     } catch {}
   }
 
+  function rrect(g, x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    g.beginPath();
+    g.moveTo(x + rr, y);
+    g.arcTo(x + w, y, x + w, y + h, rr);
+    g.arcTo(x + w, y + h, x, y + h, rr);
+    g.arcTo(x, y + h, x, y, rr);
+    g.arcTo(x, y, x + w, y, rr);
+    g.closePath();
+  }
+  function ink(g, w) {
+    g.lineJoin = "round";
+    g.lineCap = "round";
+    g.strokeStyle = "#1c1c1c";
+    g.lineWidth = w == null ? 3.2 : w;
+  }
+  function sausage(g, x, y, ang, len, thick) {
+    g.save();
+    g.translate(x, y);
+    g.rotate(ang);
+    g.fillStyle = "#fffdf8";
+    rrect(g, 0, -thick / 2, len, thick, thick / 2);
+    g.fill();
+    g.stroke();
+    g.restore();
+  }
+  function stickLeg(g, x, y, ang, len) {
+    g.save();
+    g.translate(x, y);
+    g.rotate(ang);
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.lineTo(0, len);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(-5, len);
+    g.lineTo(8, len);
+    g.stroke();
+    g.restore();
+  }
+  function ovalEyes(g, x0, y0, x1, y1, blink, look) {
+    const h = 7.2 * (blink == null ? 1 : blink);
+    [x0, x1].forEach((x, i) => {
+      g.fillStyle = "#fff";
+      g.beginPath();
+      g.ellipse(x, y0, 6.2, h, 0, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      if (h > 2.2) {
+        g.fillStyle = "#1c1c1c";
+        g.beginPath();
+        g.ellipse(x + (look || 0), y1, 3.1, Math.max(1.4, h * 0.55), 0, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "#fff";
+        g.beginPath();
+        g.ellipse(x + (look || 0) + 1.2, y1 - 1.4, 1.1, 1.3, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+    });
+  }
+  function flowerBlob(g, cx, cy, r) {
+    g.beginPath();
+    [[-0.55, -0.18], [0.55, -0.18], [0, -0.72], [0, 0.38]].forEach(([px, py], i) => {
+      if (i === 0) g.moveTo(cx + px * r + r * 0.55, cy + py * r);
+      g.ellipse(cx + px * r, cy + py * r, r * 0.62, r * 0.58, 0, 0, Math.PI * 2);
+    });
+  }
+  function puffBlob(g, cx, cy, r) {
+    g.beginPath();
+    g.ellipse(cx - r * 0.55, cy, r * 0.62, r * 0.7, 0, 0, Math.PI * 2);
+    g.ellipse(cx, cy - r * 0.12, r * 0.72, r * 0.78, 0, 0, Math.PI * 2);
+    g.ellipse(cx + r * 0.55, cy + r * 0.05, r * 0.62, r * 0.68, 0, 0, Math.PI * 2);
+  }
+  function heartPath(g, cx, cy, s) {
+    g.beginPath();
+    g.moveTo(cx, cy + s * 0.72);
+    g.bezierCurveTo(cx - s * 1.15, cy + s * 0.08, cx - s * 0.85, cy - s * 0.85, cx, cy - s * 0.28);
+    g.bezierCurveTo(cx + s * 0.85, cy - s * 0.85, cx + s * 1.15, cy + s * 0.08, cx, cy + s * 0.72);
+  }
+  function drawCustomFace(g, cx, cy, r) {
+    g.save();
+    g.beginPath();
+    g.arc(cx, cy, r, 0, Math.PI * 2);
+    g.closePath();
+    g.clip();
+    if (customHead) {
+      g.drawImage(customHead, cx - r, cy - r, r * 2, r * 2);
+    } else {
+      g.fillStyle = "#f3e4d4";
+      g.fill();
+      g.strokeStyle = "#1c1c1c";
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(cx - r * 0.28, cy);
+      g.lineTo(cx + r * 0.28, cy);
+      g.moveTo(cx, cy - r * 0.28);
+      g.lineTo(cx, cy + r * 0.28);
+      g.stroke();
+    }
+    g.restore();
+    g.beginPath();
+    g.arc(cx, cy, r, 0, Math.PI * 2);
+    g.stroke();
+  }
+
+  function drawMascot(g, kind, a) {
+    const run = a.run || 0;
+    const pose = a.pose || "idle";
+    const moving = pose === "run";
+    const air = pose === "jump";
+    const win = pose === "win" || pose === "cheer";
+    const blink = a.blink == null ? 1 : a.blink;
+    const phase = Math.sin(run * Math.PI * 2);
+    ink(g);
+    g.fillStyle = "#fffdf8";
+    const liftL = moving ? Math.max(0, -phase) * 6 : air ? 4 : 0;
+    const liftR = moving ? Math.max(0, phase) * 6 : air ? 2 : 0;
+    const swingL = moving ? phase * 0.45 : air ? -0.4 : 0;
+    const swingR = moving ? -phase * 0.45 : air ? 0.35 : 0;
+
+    if (kind === "flower") {
+      g.fillStyle = "#1c1c1c";
+      rrect(g, -16, -20, 10, 18, 3);
+      g.fill();
+      rrect(g, 6, -20, 10, 18, 3);
+      g.fill();
+      g.fillStyle = "#fffdf8";
+      rrect(g, -28, -8, 56, 10, 5);
+      g.fill();
+      g.stroke();
+      g.fillStyle = "#1c1c1c";
+      g.beginPath();
+      g.arc(-16, 2, 4.2, 0, Math.PI * 2);
+      g.arc(16, 2, 4.2, 0, Math.PI * 2);
+      g.fill();
+      sausage(g, -22, -38, -2.4 + swingL * 0.4, 26, 11);
+      sausage(g, 20, -36, -0.15 + swingR * 0.35, 28, 11);
+      g.fillStyle = "#f5d031";
+      flowerBlob(g, 0, -46, 26);
+      g.fill();
+      g.stroke();
+      ovalEyes(g, -7, -50, 8, -49, blink);
+      g.beginPath();
+      g.arc(0, -40, 3.2, 0.2, Math.PI - 0.2);
+      g.stroke();
+    } else if (kind === "puff") {
+      stickLeg(g, -8, -18, swingL * 0.25, 18 - liftL * 0.3);
+      stickLeg(g, 8, -18, swingR * 0.25, 18 - liftR * 0.3);
+      sausage(g, -28, -36, 2.5, 22, 12);
+      sausage(g, 28, -36, 0.65, 22, 12);
+      g.fillStyle = "#e85a28";
+      puffBlob(g, 0, -42, 26);
+      g.fill();
+      g.stroke();
+      ovalEyes(g, -8, -48, 9, -47, blink);
+      g.beginPath();
+      g.moveTo(-8, -34);
+      g.quadraticCurveTo(0, -28, 8, -34);
+      g.stroke();
+    } else if (kind === "shy") {
+      stickLeg(g, -9, -16, -0.15 + swingL, 17 - liftL * 0.4);
+      stickLeg(g, 8, -16, 0.35 + swingR, 17 - liftR * 0.4);
+      g.fillStyle = "#6cb4ea";
+      g.beginPath();
+      g.arc(0, -42, 26, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      sausage(g, -6, -38, 2.7, 24, 11);
+      sausage(g, 6, -36, 0.45, 24, 11);
+      ovalEyes(g, -8, -50, 8, -49, blink, 0.6);
+      g.beginPath();
+      g.moveTo(-7, -32);
+      g.quadraticCurveTo(0, -36, 7, -32);
+      g.stroke();
+    } else if (kind === "grin" || kind === "custom") {
+      stickLeg(g, -10, -16, -0.55 + swingL, 16 - liftL * 0.5);
+      stickLeg(g, 9, -16, 0.55 + swingR, 16 - liftR * 0.5);
+      const armUp = win || moving || air ? -2.4 : -1.1;
+      sausage(g, -18, -52, armUp + swingL * 0.2, 24, 11);
+      sausage(g, 18, -52, -Math.PI - armUp - swingR * 0.2, 24, 11);
+      if (kind === "custom") {
+        drawCustomFace(g, 0, -44, 26);
+      } else {
+        g.fillStyle = "#8a5ad8";
+        g.beginPath();
+        g.arc(0, -44, 26, 0, Math.PI * 2);
+        g.fill();
+        g.stroke();
+        ovalEyes(g, -8, -52, 8, -51, blink);
+        g.fillStyle = "#1c1c1c";
+        rrect(g, -12, -38, 24, 14, 7);
+        g.fill();
+        g.fillStyle = "#fffdf8";
+        rrect(g, -9, -36, 7, 8, 2);
+        g.fill();
+        rrect(g, 2, -36, 7, 8, 2);
+        g.fill();
+      }
+    } else if (kind === "heart") {
+      stickLeg(g, -8, -16, swingL * 0.3, 16);
+      stickLeg(g, 8, -16, swingR * 0.3, 16);
+      sausage(g, -20, -40, 2.4 + swingL * 0.2, 22, 11);
+      sausage(g, 18, -48, win || air ? -2.6 : -1.2, 24, 11);
+      g.fillStyle = "#f4a0c0";
+      heartPath(g, 0, -44, 28);
+      g.fill();
+      g.stroke();
+      ovalEyes(g, -8, -50, 8, -49, blink);
+      g.beginPath();
+      g.arc(0, -38, 5, 0.15, Math.PI - 0.15);
+      g.stroke();
+    }
+  }
+
+  function paintHeroOn(canvas, kind, scale, bob) {
+    if (!canvas) return;
+    const g = canvas.getContext("2d");
+    const w = canvas.width;
+    const h = canvas.height;
+    g.clearRect(0, 0, w, h);
+    g.save();
+    g.translate(w / 2, h * 0.88 - (bob || 0));
+    g.scale(scale, scale);
+    if (kind === "usagi" && SPRITES.idle) {
+      const img = SPRITES.idle;
+      const H = 88;
+      const W = H * (img.width / img.height);
+      g.drawImage(img, -W / 2, -H, W, H);
+    } else if (kind !== "usagi") {
+      drawMascot(g, kind, { pose: "idle", run: 0, blink: 1, bob: 0, facing: 1, sx: 1, sy: 1, tilt: 0 });
+    }
+    g.restore();
+  }
+
+  function setHero(kind) {
+    heroKind = kind || "usagi";
+    try {
+      localStorage.setItem("usagi-hero", heroKind);
+    } catch {}
+    document.querySelectorAll(".hero-pick").forEach((b) => b.classList.toggle("is-on", b.dataset.hero === heroKind));
+    syncHeroUi();
+  }
+
+  function syncHeroUi() {
+    const titleImg = document.getElementById("title-usagi");
+    const titleCv = document.getElementById("title-hero");
+    const endImg = document.getElementById("end-usagi");
+    const endCv = document.getElementById("end-hero");
+    const useMascot = heroKind !== "usagi";
+    if (titleImg) titleImg.hidden = useMascot;
+    if (titleCv) titleCv.hidden = !useMascot;
+    if (endImg && useMascot) endImg.hidden = true;
+    if (endCv) endCv.hidden = !useMascot;
+    paintHeroOn(document.getElementById("hero-orb-face"), heroKind, 1.35, 0);
+    paintHeroOn(document.getElementById("hud-hero"), heroKind, 0.55, 0);
+    if (titleCv && useMascot) paintHeroOn(titleCv, heroKind, 2.1, 0);
+    if (endCv && useMascot) paintHeroOn(endCv, heroKind, 2.1, 0);
+    document.querySelectorAll(".hero-pick").forEach((b) => {
+      const cv = b.querySelector("canvas");
+      if (cv) {
+        cv.width = 180;
+        cv.height = 160;
+        paintHeroOn(cv, b.dataset.hero, 1.45, 0);
+      }
+    });
+  }
+
+  function openHeroModal() {
+    const modal = document.getElementById("hero-modal");
+    if (!modal) return;
+    modal.hidden = false;
+    const hb = document.getElementById("btn-hero");
+    const orb3 = document.getElementById("btn-3d");
+    if (hb) hb.style.visibility = "hidden";
+    if (orb3) orb3.style.visibility = "hidden";
+    syncHeroUi();
+  }
+  function closeHeroModal() {
+    const modal = document.getElementById("hero-modal");
+    if (modal) modal.hidden = true;
+    const hb = document.getElementById("btn-hero");
+    const orb3 = document.getElementById("btn-3d");
+    if (hb) hb.style.visibility = "";
+    if (orb3) orb3.style.visibility = "";
+  }
+
+  function pulseHeroUi() {
+    const t = performance.now() / 1000;
+    const bob = Math.sin(t * 2);
+    const hb = document.getElementById("btn-hero");
+    if (hb && !hb.hidden) paintHeroOn(document.getElementById("hero-orb-face"), heroKind, 1.35, bob * 2);
+    const titleCv = document.getElementById("title-hero");
+    if (titleCv && !titleCv.hidden) paintHeroOn(titleCv, heroKind, 2.1, bob * 3);
+    const endCv = document.getElementById("end-hero");
+    if (endCv && !endCv.hidden) paintHeroOn(endCv, heroKind, 2.1, bob * 3);
+  }
+
   function pickSprite(pose) {
     if (pose === "run" && SPRITES.run) return { img: SPRITES.run, side: true };
     if (pose === "jump" && (SPRITES.jump || SPRITES.run)) return { img: SPRITES.jump || SPRITES.run, side: true };
@@ -2312,6 +2625,17 @@
   }
 
   function drawUsagi(x, y, a) {
+    if (heroKind !== "usagi") {
+      if (mode3d) drawSoftShadow(x + 4, y + 2, 26, 8);
+      ctx.save();
+      ctx.translate(x, y - (a.bob || 0));
+      ctx.scale(a.facing || 1, 1);
+      ctx.rotate(a.tilt || 0);
+      ctx.scale(a.sx || 1, a.sy || 1);
+      drawMascot(ctx, heroKind, a);
+      ctx.restore();
+      return;
+    }
     if (SPRITES.ready && drawSpriteUsagi(x, y, a)) return;
     if (mode3d) drawSoftShadow(x, y - 1, 22, 7);
     ctx.save();
@@ -3699,6 +4023,7 @@
     if (timeEl) timeEl.textContent = formatTime(levelTime);
     const atk = document.getElementById("btn-attack");
     if (atk) atk.classList.toggle("is-off", !hasStick);
+    paintHeroOn(document.getElementById("hud-hero"), heroKind, 0.55, 0);
   }
 
   function applyTheme(name) {
@@ -3764,6 +4089,8 @@
     overlay.inert = true;
     hud.hidden = false;
     controls.hidden = false;
+    const hb = document.getElementById("btn-hero");
+    if (hb) hb.hidden = true;
     refreshHud();
   }
 
@@ -3776,6 +4103,10 @@
     cardEnd.hidden = true;
     hud.hidden = true;
     controls.hidden = true;
+    const hb = document.getElementById("btn-hero");
+    if (hb) hb.hidden = false;
+    closeHeroModal();
+    syncHeroUi();
   }
 
   function showClear() {
@@ -3786,7 +4117,7 @@
     cardEnd.hidden = false;
     const usagi = document.getElementById("end-usagi");
     const poop = document.getElementById("end-poop");
-    if (usagi) usagi.hidden = false;
+    if (usagi) usagi.hidden = heroKind !== "usagi";
     if (poop) poop.hidden = true;
     startCheerPose();
     document.getElementById("end-title").textContent = "過關！";
@@ -3826,7 +4157,7 @@
     cardEnd.hidden = false;
     const usagi = document.getElementById("end-usagi");
     const poop = document.getElementById("end-poop");
-    if (usagi) usagi.hidden = !win;
+    if (usagi) usagi.hidden = !win || heroKind !== "usagi";
     if (poop) poop.hidden = win;
     if (win) startCheerPose();
     else stopCheerPose();
@@ -3882,11 +4213,14 @@
       }
       updateFx(dt);
       render();
+      pulseHeroUi();
     } else if (state === "title" || !world) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       drawBackground();
+      pulseHeroUi();
     } else {
       render();
+      pulseHeroUi();
     }
     requestAnimationFrame(loop);
   }
@@ -4039,6 +4373,86 @@
   try {
     if (sessionStorage.getItem("usagi-3d") === "1") setMode3d(true);
   } catch {}
+
+  function applyCustomHeadData(dataUrl) {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = 256;
+      c.height = 256;
+      const g = c.getContext("2d");
+      const s = Math.min(img.width, img.height);
+      const sx = (img.width - s) / 2;
+      const sy = (img.height - s) / 2;
+      g.beginPath();
+      g.arc(128, 128, 128, 0, Math.PI * 2);
+      g.closePath();
+      g.clip();
+      g.drawImage(img, sx, sy, s, s, 0, 0, 256, 256);
+      customHead = c;
+      try {
+        localStorage.setItem("usagi-hero-head", c.toDataURL("image/jpeg", 0.82));
+      } catch {}
+      setHero("custom");
+    };
+    img.src = dataUrl;
+  }
+
+  const heroBtn = document.getElementById("btn-hero");
+  if (heroBtn) heroBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openHeroModal();
+  });
+  const heroClose = document.getElementById("hero-close");
+  if (heroClose) heroClose.addEventListener("click", closeHeroModal);
+  const heroModal = document.getElementById("hero-modal");
+  if (heroModal) {
+    heroModal.addEventListener("click", (e) => {
+      if (e.target === heroModal) closeHeroModal();
+    });
+  }
+  document.querySelectorAll(".hero-pick").forEach((b) => {
+    b.addEventListener("click", () => {
+      const kind = b.dataset.hero;
+      if (kind === "custom") {
+        if (!customHead || heroKind === "custom") document.getElementById("hero-file").click();
+        else setHero("custom");
+        return;
+      }
+      setHero(kind);
+    });
+  });
+  const heroFile = document.getElementById("hero-file");
+  if (heroFile) {
+    heroFile.addEventListener("change", () => {
+      const file = heroFile.files && heroFile.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => applyCustomHeadData(reader.result);
+      reader.readAsDataURL(file);
+      heroFile.value = "";
+    });
+  }
+  try {
+    const savedHero = localStorage.getItem("usagi-hero");
+    const savedHead = localStorage.getItem("usagi-hero-head");
+    if (savedHead) {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = 256;
+        c.height = 256;
+        c.getContext("2d").drawImage(img, 0, 0, 256, 256);
+        customHead = c;
+        if (savedHero) setHero(savedHero);
+        else syncHeroUi();
+      };
+      img.src = savedHead;
+    } else if (savedHero) setHero(savedHero);
+  } catch {}
+  setTimeout(syncHeroUi, 200);
+
   const qs = new URLSearchParams(location.search);
   if (qs.get("autostart") === "1") {
     startGame(Number(qs.get("level") || 0));
