@@ -241,6 +241,7 @@
 
   let dpr = 1;
   let state = "title";
+  let mode3d = false;
   let last = 0;
   let shake = 0;
   let world;
@@ -2070,6 +2071,208 @@
     ctx.closePath();
   }
 
+  function parseCol(c) {
+    if (!c) return [200, 170, 130];
+    if (c[0] === "#") {
+      let h = c.slice(1);
+      if (h.length === 3) h = h.split("").map((x) => x + x).join("");
+      const n = parseInt(h, 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    const m = String(c).match(/\d+/g);
+    return m ? [+m[0], +m[1], +m[2]] : [200, 170, 130];
+  }
+  function shade(c, amt) {
+    const rgb = parseCol(c);
+    const to = amt >= 0 ? 255 : 0;
+    const a = Math.abs(amt);
+    return "rgb(" + rgb.map((v) => Math.round(v + (to - v) * a)).join(",") + ")";
+  }
+  const D3X = 15;
+  const D3Y = -17;
+
+  function drawSoftShadow(x, y, rx, ry) {
+    ctx.save();
+    const g = ctx.createRadialGradient(x, y, 1, x, y, rx);
+    g.addColorStop(0, "rgba(30,18,12,0.38)");
+    g.addColorStop(0.55, "rgba(30,18,12,0.12)");
+    g.addColorStop(1, "rgba(30,18,12,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  function drawGloss(x, y, rx, ry) {
+    ctx.save();
+    const g = ctx.createRadialGradient(x - rx * 0.35, y - ry * 0.45, 0, x, y, rx);
+    g.addColorStop(0, "rgba(255,255,255,0.55)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.12)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  function quad(a, b, c, d) {
+    ctx.beginPath();
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+    ctx.lineTo(c[0], c[1]);
+    ctx.lineTo(d[0], d[1]);
+    ctx.closePath();
+  }
+  function drawBlock3d(x, y, w, h, color, opt) {
+    const dx = opt && opt.dx != null ? opt.dx : D3X;
+    const dy = opt && opt.dy != null ? opt.dy : D3Y;
+    const r = opt && opt.r != null ? opt.r : 8;
+    const topC = opt && opt.top ? opt.top : shade(color, 0.42);
+    const frontC = color;
+    ctx.save();
+    if (!opt || !opt.noShadow) drawSoftShadow(x + w * 0.55, y + h + 3, w * 0.48, 7);
+    const side = ctx.createLinearGradient(x + w, y, x + w + dx, y);
+    side.addColorStop(0, shade(color, -0.18));
+    side.addColorStop(1, shade(color, -0.42));
+    ctx.fillStyle = side;
+    quad([x + w, y + 1], [x + w + dx, y + dy], [x + w + dx, y + h + dy], [x + w, y + h]);
+    ctx.fill();
+    const top = ctx.createLinearGradient(x, y + dy, x, y);
+    top.addColorStop(0, shade(topC, 0.18));
+    top.addColorStop(1, topC);
+    ctx.fillStyle = top;
+    quad([x, y], [x + dx, y + dy], [x + w + dx, y + dy], [x + w, y]);
+    ctx.fill();
+    const front = ctx.createLinearGradient(x, y, x, y + h);
+    front.addColorStop(0, shade(frontC, 0.12));
+    front.addColorStop(0.55, frontC);
+    front.addColorStop(1, shade(frontC, -0.22));
+    ctx.fillStyle = front;
+    roundRect(x, y, w, h, r);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(40,24,16,0.22)";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.28)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y + 3);
+    ctx.lineTo(x + w - r, y + 3);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawSphere3d(x, y, rx, ry, color) {
+    ctx.save();
+    const g = ctx.createRadialGradient(x - rx * 0.32, y - ry * 0.4, rx * 0.08, x, y + ry * 0.2, rx * 1.2);
+    g.addColorStop(0, shade(color, 0.62));
+    g.addColorStop(0.42, color);
+    g.addColorStop(1, shade(color, -0.38));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(40,24,16,0.22)";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    drawGloss(x, y, rx * 0.92, ry * 0.92);
+    ctx.restore();
+  }
+  function drawMound(cx, cy, rx, ry, color) {
+    ctx.save();
+    drawSoftShadow(cx + 8, cy + ry * 0.55, rx * 0.9, ry * 0.22);
+    const g = ctx.createRadialGradient(cx - rx * 0.22, cy - ry * 0.48, ry * 0.12, cx + rx * 0.1, cy + ry * 0.25, rx);
+    g.addColorStop(0, shade(color, 0.55));
+    g.addColorStop(0.4, color);
+    g.addColorStop(1, shade(color, -0.4));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  function drawCloud3d(x, y, s) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    const puffs = [
+      [0, 10, 18],
+      [20, 2, 24],
+      [44, 10, 17],
+      [18, 16, 14],
+    ];
+    puffs.forEach(([px, py, r]) => {
+      drawSphere3d(px, py, r, r * 0.78, "#f4fbff");
+    });
+    ctx.restore();
+  }
+  function drawTerrainSlab(x, y, w, h) {
+    const dx = D3X;
+    const dy = D3Y;
+    const cap = 16;
+    ctx.save();
+    const side = ctx.createLinearGradient(x + w, y, x + w + dx, y);
+    side.addColorStop(0, shade(COL.dirt, -0.08));
+    side.addColorStop(1, shade(COL.dirtDark || COL.dirt, -0.15));
+    ctx.fillStyle = side;
+    quad([x + w, y + cap], [x + w + dx, y + cap + dy], [x + w + dx, y + h + dy], [x + w, y + h]);
+    ctx.fill();
+    const cliff = ctx.createLinearGradient(x, y + cap, x, y + h);
+    cliff.addColorStop(0, shade(COL.dirt, 0.08));
+    cliff.addColorStop(0.35, COL.dirt);
+    cliff.addColorStop(1, shade(COL.dirtDark || COL.dirt, -0.08));
+    ctx.fillStyle = cliff;
+    ctx.fillRect(x, y + cap - 1, w, h - cap + 1);
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    for (let py = y + cap + 10; py < y + h - 6; py += 14) {
+      for (let px = x + 8 + ((py / 14) % 2) * 8; px < x + w - 8; px += 16) {
+        ctx.beginPath();
+        ctx.ellipse(px, py, 3.2, 2.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    const top = ctx.createLinearGradient(x, y + dy, x, y);
+    top.addColorStop(0, shade(COL.grass, 0.45));
+    top.addColorStop(1, COL.grass);
+    ctx.fillStyle = top;
+    quad([x - 1, y], [x + dx, y + dy], [x + w + dx, y + dy], [x + w + 1, y]);
+    ctx.fill();
+    const lip = ctx.createLinearGradient(x, y, x, y + cap);
+    lip.addColorStop(0, shade(COL.grass, 0.2));
+    lip.addColorStop(1, COL.grassDark || shade(COL.grass, -0.2));
+    ctx.fillStyle = lip;
+    roundRect(x - 1, y - 1, w + 2, cap + 2, 8);
+    ctx.fill();
+    ctx.fillStyle = shade(COL.grass, 0.35);
+    ctx.fillRect(x + 8, y + 4, 7, 4);
+    ctx.fillRect(x + 22, y + 5, 9, 4);
+    ctx.restore();
+  }
+  function tile3(tx, ty) {
+    if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return 0;
+    return world.grid[ty][tx];
+  }
+  function dirtUnderGrass(tx, ty) {
+    for (let y = ty - 1; y >= 0; y--) {
+      const id = tile3(tx, y);
+      if (id === T_GRASS) return true;
+      if (id !== T_DIRT) return false;
+    }
+    return false;
+  }
+
+  function setMode3d(on) {
+    mode3d = !!on;
+    document.body.classList.toggle("mode-3d", mode3d);
+    const btn = document.getElementById("btn-3d");
+    if (btn) {
+      btn.classList.toggle("is-on", mode3d);
+      btn.setAttribute("aria-pressed", mode3d ? "true" : "false");
+    }
+    try {
+      sessionStorage.setItem("usagi-3d", mode3d ? "1" : "0");
+    } catch {}
+  }
+
   function pickSprite(pose) {
     if (pose === "run" && SPRITES.run) return { img: SPRITES.run, side: true };
     if (pose === "jump" && (SPRITES.jump || SPRITES.run)) return { img: SPRITES.jump || SPRITES.run, side: true };
@@ -2084,19 +2287,33 @@
     if (!img) return false;
     const H = 88;
     const W = H * (img.width / img.height);
+    if (mode3d) drawSoftShadow(x + 4, y + 2, 28, 9);
     ctx.save();
     ctx.translate(x, y - (a.bob || 0));
     const flip = picked.side ? -a.facing : a.facing;
     ctx.scale(flip, 1);
     ctx.rotate(a.tilt || 0);
     ctx.scale(a.sx, a.sy);
+    if (mode3d) {
+      ctx.filter = "drop-shadow(8px 10px 0 rgba(40,24,16,0.16)) saturate(1.12) contrast(1.06)";
+    }
     ctx.drawImage(img, -W / 2, -H, W, H);
+    if (mode3d) {
+      ctx.filter = "none";
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.ellipse(-W * 0.1, -H * 0.58, W * 0.2, H * 0.14, -0.45, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
     return true;
   }
 
   function drawUsagi(x, y, a) {
     if (SPRITES.ready && drawSpriteUsagi(x, y, a)) return;
+    if (mode3d) drawSoftShadow(x, y - 1, 22, 7);
     ctx.save();
     ctx.translate(x, y - a.bob);
     ctx.scale(1.12 * a.facing, 1.12);
@@ -2242,25 +2459,39 @@
     const x = e.x + e.w / 2;
     const y = e.y + e.h;
     const walk = Math.sin(e.t * 10) * (e.alive ? 3 : 0);
+    if (mode3d) drawSoftShadow(x, y, 16, 6);
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(1, e.alive ? 1 : e.squash);
     ctx.lineWidth = 2.8;
     ctx.strokeStyle = COL.line;
-    ctx.fillStyle = "#c9a07a";
-    ctx.beginPath();
-    ctx.ellipse(-7 + walk, -6, 5, 5.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(7 - walk, -6, 5, 5.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#d9b08a";
-    ctx.beginPath();
-    ctx.ellipse(0, -18, 16, 14, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    if (mode3d) {
+      drawSphere3d(0, -18, 16, 14, "#d9b08a");
+      ctx.fillStyle = "#c9a07a";
+      ctx.beginPath();
+      ctx.ellipse(-7 + walk, -6, 5, 5.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(7 - walk, -6, 5, 5.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "#c9a07a";
+      ctx.beginPath();
+      ctx.ellipse(-7 + walk, -6, 5, 5.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(7 - walk, -6, 5, 5.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#d9b08a";
+      ctx.beginPath();
+      ctx.ellipse(0, -18, 16, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
     if (e.alive) {
       ctx.fillStyle = COL.eye;
       ctx.beginPath();
@@ -2282,6 +2513,7 @@
     const x = e.x + e.w / 2;
     const y = e.y + e.h;
     const rising = e.vy < -40;
+    if (mode3d) drawSoftShadow(x, y, 16, 6);
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(e.alive ? 1 : 1, e.alive ? 1 : e.squash);
@@ -2330,6 +2562,7 @@
     const y = e.y + e.h;
     const walk = Math.sin(e.t * 8) * (e.alive ? 3 : 0);
     const face = e.vx >= 0 ? 1 : -1;
+    if (mode3d) drawSoftShadow(x, y, 18, 6);
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(face, e.alive ? 1 : e.squash);
@@ -2389,6 +2622,7 @@
     const y = e.y + e.h / 2;
     const flap = Math.sin(e.t * 12) * (e.alive ? 10 : 0);
     const face = e.vx >= 0 ? 1 : -1;
+    if (mode3d) drawSoftShadow(x, y + 12, 14, 5);
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(face, e.alive ? 1 : e.squash);
@@ -2435,6 +2669,7 @@
     const x = e.x + e.w / 2;
     const y = e.y + e.h / 2;
     const pulse = 1 + Math.sin(e.t * 4) * 0.08;
+    if (mode3d) drawSoftShadow(x, y + 10, 14, 5);
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(pulse, e.alive ? 1 : e.squash);
@@ -2464,6 +2699,7 @@
     const x = e.x + e.w / 2;
     const y = e.y + e.h / 2;
     const face = e.vx >= 0 ? 1 : -1;
+    if (mode3d) drawSoftShadow(x, y + 8, 22, 6);
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(face, e.alive ? 1 : e.squash);
@@ -2532,6 +2768,7 @@
       const h = Math.max(8, b.h * sq);
       const y = b.y + b.h - h;
       const cx = b.x + b.w / 2;
+      if (mode3d) drawSoftShadow(cx, b.y + b.h + 2, 16, 5);
       ctx.save();
       ctx.lineWidth = 2.4;
       ctx.strokeStyle = COL.line;
@@ -2542,21 +2779,25 @@
       roundRect(b.x + b.w - 10, y + h - 7, 7, 10, 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "#ff5a6a";
-      roundRect(b.x, y, b.w, h - 4, 10);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#fff3c8";
-      ctx.beginPath();
-      ctx.ellipse(cx, y + (h - 4) * 0.42, b.w * 0.32, (h - 4) * 0.28, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffe27a";
-      ctx.beginPath();
-      ctx.arc(cx - 8, y + 5, 3.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(cx + 8, y + 6, 2.6, 0, Math.PI * 2);
-      ctx.fill();
+      if (mode3d) {
+        drawSphere3d(cx, y + (h - 4) * 0.45, b.w * 0.46, (h - 2) * 0.55, "#ff5a6a");
+      } else {
+        ctx.fillStyle = "#ff5a6a";
+        roundRect(b.x, y, b.w, h - 4, 10);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#fff3c8";
+        ctx.beginPath();
+        ctx.ellipse(cx, y + (h - 4) * 0.42, b.w * 0.32, (h - 4) * 0.28, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ffe27a";
+        ctx.beginPath();
+        ctx.arc(cx - 8, y + 5, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx + 8, y + 6, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     });
   }
@@ -2723,6 +2964,30 @@
       ctx.fill();
       ctx.stroke();
     }
+    if (mode3d) {
+      drawSoftShadow(0, 13, 11, 4.5);
+      const edge = 3.2;
+      ctx.fillStyle = shade(COL.coin, -0.35);
+      ctx.beginPath();
+      ctx.ellipse(edge, 1, 9, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.scale(spin, 1);
+      const g = ctx.createRadialGradient(-3, -4, 1, 2, 2, 12);
+      g.addColorStop(0, "#fff3b0");
+      g.addColorStop(0.35, COL.coin);
+      g.addColorStop(1, "#c7922a");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 9, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#e0b040";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 5.2, 6.4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     ctx.scale(spin, 1);
     ctx.fillStyle = COL.coin;
     ctx.strokeStyle = "#c7922a";
@@ -2739,6 +3004,10 @@
   }
 
   function drawBackground() {
+    if (mode3d) {
+      drawBackground3d();
+      return;
+    }
     const g = ctx.createLinearGradient(0, 0, 0, VIEW_H);
     g.addColorStop(0, COL.skyTop);
     g.addColorStop(1, COL.skyBot);
@@ -2837,6 +3106,34 @@
       hill(0.62, 0.28, 160);
     }
   }
+  function drawBackground3d() {
+    const t = player ? player.t : 0;
+    const sky = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+    sky.addColorStop(0, shade(COL.skyTop, 0.4));
+    sky.addColorStop(0.42, COL.skyTop);
+    sky.addColorStop(1, COL.skyBot);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const sun = ctx.createRadialGradient(VIEW_W * 0.74, 64, 8, VIEW_W * 0.7, 90, 260);
+    sun.addColorStop(0, "rgba(255,255,255,0.7)");
+    sun.addColorStop(0.35, "rgba(255,255,255,0.18)");
+    sun.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = sun;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    for (let i = 0; i < 5; i++) {
+      const cx = ((i * 340 - cam.x * 0.08 + t * 3) % (VIEW_W + 280)) - 80;
+      drawCloud3d(cx, 28 + (i % 3) * 18, 1.15 + (i % 3) * 0.18);
+    }
+    drawMound(VIEW_W * 0.18 - cam.x * 0.12, VIEW_H * 0.62, 210, 120, shade(COL.hill1, 0.12));
+    drawMound(VIEW_W * 0.58 - cam.x * 0.1, VIEW_H * 0.55, 260, 150, COL.hill1);
+    drawMound(VIEW_W * 0.88 - cam.x * 0.14, VIEW_H * 0.5, 190, 170, shade(COL.hill2, 0.08));
+    drawMound(VIEW_W * 0.42 - cam.x * 0.18, VIEW_H * 0.72, 160, 90, COL.hill2);
+    const haze = ctx.createLinearGradient(0, VIEW_H * 0.45, 0, VIEW_H);
+    haze.addColorStop(0, "rgba(255,255,255,0)");
+    haze.addColorStop(1, "rgba(255,255,255,0.16)");
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
   function drawKandinskyBg() {
     const t = player ? player.t : 0;
     const shapes = [
@@ -2909,6 +3206,13 @@
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(s, s);
+    if (mode3d) {
+      const g = ctx.createRadialGradient(14, 2, 4, 18, 12, 40);
+      g.addColorStop(0, "rgba(255,255,255,0.98)");
+      g.addColorStop(0.5, "rgba(232,244,255,0.92)");
+      g.addColorStop(1, "rgba(160,196,230,0.35)");
+      ctx.fillStyle = g;
+    }
     ctx.beginPath();
     ctx.arc(0, 10, 16, 0, Math.PI * 2);
     ctx.arc(18, 6, 20, 0, Math.PI * 2);
@@ -2927,6 +3231,90 @@
     }
     ctx.lineTo(VIEW_W, VIEW_H);
     ctx.fill();
+    if (mode3d) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      for (let x = -40; x <= VIEW_W + 40; x += 8) {
+        const wx = x + cam.x * par;
+        const y = base - Math.abs(Math.sin(wx / gap)) * 90 * h - 30 * h;
+        if (x === -40) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawTiles3d(x0, x1, y0, y1) {
+    for (let ty = y1; ty >= y0; ty--) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const id = world.grid[ty][tx];
+        if (!id) continue;
+        const x = tx * TILE;
+        const y = ty * TILE;
+        if (id === T_DIRT && dirtUnderGrass(tx, ty)) continue;
+        if (id === T_GRASS) {
+          let bottom = ty;
+          while (bottom + 1 < MAP_H && tile3(tx, bottom + 1) === T_DIRT) bottom++;
+          drawTerrainSlab(x, y, TILE, (bottom + 1) * TILE - y);
+        } else if (id === T_LAVA) {
+          const t = player ? player.t : 0;
+          const wave = Math.sin(t * 4 + tx) * 3;
+          drawSphere3d(x + TILE / 2, y + 18 + wave, 18, 12, "#ff6b2d");
+        } else if (id === T_DIRT) {
+          drawBlock3d(x + 1, y + 1, TILE - 2, TILE - 2, COL.dirt, { r: 8, top: shade(COL.dirt, 0.25) });
+        } else if (id === T_BRICK) {
+          drawBlock3d(x + 3, y + 3, TILE - 6, TILE - 6, COL.brick, { r: 9, top: shade(COL.brick, 0.28) });
+          ctx.strokeStyle = "rgba(40,24,16,0.16)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x + 10, y + TILE / 2);
+          ctx.lineTo(x + TILE - 10, y + TILE / 2);
+          ctx.stroke();
+        } else if (id === T_Q || id === T_QUSED) {
+          const col = id === T_Q ? "#f4c64a" : "#d3b07a";
+          drawBlock3d(x + 3, y + 3, TILE - 6, TILE - 6, col, { r: 10, top: "#ffe27a" });
+          ctx.fillStyle = COL.line;
+          ctx.font = "700 22px Fredoka, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(id === T_Q ? "?" : "•", x + TILE / 2, y + TILE / 2 + 1);
+        } else if (id === T_WOOD) {
+          drawBlock3d(x + 1, y + 2, TILE - 2, 14, COL.wood, { r: 7, dy: -12, dx: 12, top: shade(COL.wood, 0.3) });
+        } else if (id === T_PIPE) {
+          const top = ty === 0 || world.grid[ty - 1][tx] !== T_PIPE;
+          if (top && (tx === 0 || world.grid[ty][tx - 1] !== T_PIPE)) {
+            drawBlock3d(x - 4, y, TILE * 2 + 8, 18, COL.pipe, { r: 10, top: shade(COL.pipe, 0.35) });
+          }
+          if (!top && (tx === 0 || world.grid[ty][tx - 1] !== T_PIPE)) {
+            drawBlock3d(x + 2, y, TILE * 2 - 4, TILE + 1, COL.pipe, { r: 6 });
+          }
+        } else if (id === T_FLAG && (tx === 0 || world.grid[ty][tx - 1] !== T_FLAG) && (ty === 0 || world.grid[ty - 1][tx] !== T_FLAG)) {
+          const pole = ctx.createLinearGradient(x + 16, y, x + 26, y);
+          pole.addColorStop(0, "#fff6dc");
+          pole.addColorStop(0.45, "#e8d9b0");
+          pole.addColorStop(1, "#b89a68");
+          ctx.fillStyle = pole;
+          ctx.fillRect(x + 16, y, 8, 11 * TILE);
+          ctx.save();
+          ctx.shadowColor = "rgba(40,24,16,0.28)";
+          ctx.shadowBlur = 10;
+          ctx.shadowOffsetX = 8;
+          ctx.fillStyle = "#f3b4c2";
+          ctx.beginPath();
+          ctx.moveTo(x + 24, y + 8);
+          ctx.lineTo(x + 66, y + 22);
+          ctx.lineTo(x + 24, y + 42);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+          drawGloss(x + 38, y + 18, 12, 7);
+        }
+      }
+    }
   }
 
   function drawTiles() {
@@ -2934,6 +3322,11 @@
     const x1 = Math.min(MAP_W - 1, Math.floor((cam.x + VIEW_W) / TILE) + 1);
     const y0 = Math.max(0, Math.floor(cam.y / TILE) - 1);
     const y1 = Math.min(MAP_H - 1, Math.floor((cam.y + VIEW_H) / TILE) + 1);
+
+    if (mode3d) {
+      drawTiles3d(x0, x1, y0, y1);
+      return;
+    }
 
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
@@ -3635,6 +4028,17 @@
   });
 
   resize();
+  const orb = document.getElementById("btn-3d");
+  if (orb) {
+    orb.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setMode3d(!mode3d);
+    });
+  }
+  try {
+    if (sessionStorage.getItem("usagi-3d") === "1") setMode3d(true);
+  } catch {}
   const qs = new URLSearchParams(location.search);
   if (qs.get("autostart") === "1") {
     startGame(Number(qs.get("level") || 0));
